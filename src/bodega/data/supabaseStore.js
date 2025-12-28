@@ -1,0 +1,100 @@
+import { supabase } from '../../lib/supabaseClient.js'
+
+function getRequiredSupabase() {
+  if (!supabase) throw new Error('Supabase no está configurado (faltan VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY).')
+  return supabase
+}
+
+function ensureId(medication) {
+  if (medication?.id) return medication
+  if (globalThis.crypto?.randomUUID) return { ...medication, id: globalThis.crypto.randomUUID() }
+  return { ...medication, id: String(Date.now()) }
+}
+
+export const supabaseStore = {
+  async getMedications() {
+    const client = getRequiredSupabase()
+    const { data, error } = await client.from('medications').select('*').order('created_at', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
+  async upsertMedication(medication) {
+    const client = getRequiredSupabase()
+    const payload = ensureId(medication)
+    const { data, error } = await client
+      .from('medications')
+      .upsert(payload, { onConflict: 'id' })
+      .select('*')
+      .single()
+    if (error) throw error
+    return data
+  },
+
+  async upsertMedications(medications) {
+    const client = getRequiredSupabase()
+    const payload = (medications ?? []).map(ensureId)
+    const { data, error } = await client.from('medications').upsert(payload, { onConflict: 'id' }).select('*')
+    if (error) throw error
+    return data ?? []
+  },
+
+  async deleteMedication(id) {
+    const client = getRequiredSupabase()
+    const { error } = await client.from('medications').delete().eq('id', id)
+    if (error) throw error
+  },
+
+  async clearMedications() {
+    const client = getRequiredSupabase()
+    const { error } = await client.from('medications').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error) throw error
+  },
+
+  async getMonthlyBatches() {
+    const client = getRequiredSupabase()
+    const { data, error } = await client
+      .from('monthly_batches')
+      .select('id,label,items:monthly_batch_items(id,siges_code,medication_name,quantity,cost)')
+      .order('created_at', { ascending: false })
+    if (error) throw error
+    return (data ?? []).map((b) => ({ ...b, items: b.items ?? [] }))
+  },
+
+  async saveMonthlyBatch({ id, label, items }) {
+    const client = getRequiredSupabase()
+
+    const { data: batch, error: batchError } = await client
+      .from('monthly_batches')
+      .upsert({ id, label }, { onConflict: 'label' })
+      .select('id,label')
+      .single()
+    if (batchError) throw batchError
+
+    const { error: deleteError } = await client.from('monthly_batch_items').delete().eq('batch_id', batch.id)
+    if (deleteError) throw deleteError
+
+    const payload = (items ?? []).map((item) => ({
+      id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + Math.random(),
+      batch_id: batch.id,
+      siges_code: item.siges_code,
+      medication_name: item.medication_name,
+      quantity: item.quantity,
+      cost: item.cost,
+    }))
+
+    if (payload.length > 0) {
+      const { error: insertError } = await client.from('monthly_batch_items').insert(payload)
+      if (insertError) throw insertError
+    }
+
+    return { ...batch, items }
+  },
+
+  async getSelectedMonthlyBatchId() {
+    return null
+  },
+
+  async setSelectedMonthlyBatchId() {},
+}
+

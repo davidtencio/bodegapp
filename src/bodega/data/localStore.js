@@ -1,0 +1,139 @@
+const STORAGE_KEYS = {
+  medications: 'bodegapp:medications',
+  monthlyBatches: 'bodegapp:monthlyBatches',
+  selectedMonthlyBatchId: 'bodegapp:selectedMonthlyBatchId',
+}
+
+const seedMedications = [
+  {
+    id: 1,
+    name: 'Paracetamol',
+    siges_code: 'SIG-0001',
+    sicop_classifier: 'SICOP-CL-01',
+    sicop_identifier: 'SICOP-ID-0001',
+    category: 'Analgésico',
+    batch: 'LOT-2023-01',
+    expiry_date: '2025-12-30',
+    stock: 500,
+    min_stock: 100,
+    unit: 'Tabletas',
+  },
+  {
+    id: 2,
+    name: 'Amoxicilina',
+    siges_code: 'SIG-0002',
+    sicop_classifier: 'SICOP-CL-02',
+    sicop_identifier: 'SICOP-ID-0002',
+    category: 'Antibiotico',
+    batch: 'LOT-2023-05',
+    expiry_date: '2024-06-15',
+    stock: 45,
+    min_stock: 50,
+    unit: 'Cápsulas',
+  },
+  {
+    id: 3,
+    name: 'Ibuprofeno',
+    siges_code: 'SIG-0003',
+    sicop_classifier: 'SICOP-CL-03',
+    sicop_identifier: 'SICOP-ID-0003',
+    category: 'Antiinflamatorio',
+    batch: 'LOT-2023-09',
+    expiry_date: '2026-01-20',
+    stock: 120,
+    min_stock: 40,
+    unit: 'Jarabe',
+  },
+  {
+    id: 4,
+    name: 'Omeprazol',
+    siges_code: 'SIG-0004',
+    sicop_classifier: 'SICOP-CL-04',
+    sicop_identifier: 'SICOP-ID-0004',
+    category: 'Protector Gástrico',
+    batch: 'LOT-2023-12',
+    expiry_date: '2025-03-10',
+    stock: 15,
+    min_stock: 30,
+    unit: 'Cápsulas',
+  },
+]
+
+function safeJsonParse(raw) {
+  try {
+    return JSON.parse(raw)
+  } catch {
+    return null
+  }
+}
+
+function readArray(key) {
+  const raw = window.localStorage.getItem(key)
+  if (!raw) return null
+  const parsed = safeJsonParse(raw)
+  return Array.isArray(parsed) ? parsed : null
+}
+
+function writeJson(key, value) {
+  window.localStorage.setItem(key, JSON.stringify(value))
+}
+
+export const localStore = {
+  async getMedications() {
+    return readArray(STORAGE_KEYS.medications) ?? seedMedications
+  },
+
+  async upsertMedication(medication) {
+    const current = (await this.getMedications()) ?? []
+    const id = medication?.id
+    const next =
+      id == null
+        ? [...current, medication]
+        : current.some((m) => m.id === id)
+          ? current.map((m) => (m.id === id ? medication : m))
+          : [...current, medication]
+
+    writeJson(STORAGE_KEYS.medications, next)
+    return medication
+  },
+
+  async upsertMedications(medications) {
+    const current = (await this.getMedications()) ?? []
+    const byId = new Map(current.map((m) => [m.id, m]))
+    for (const medication of medications) byId.set(medication.id, medication)
+    const next = Array.from(byId.values())
+    writeJson(STORAGE_KEYS.medications, next)
+    return next
+  },
+
+  async deleteMedication(id) {
+    const current = (await this.getMedications()) ?? []
+    const next = current.filter((m) => m.id !== id)
+    writeJson(STORAGE_KEYS.medications, next)
+  },
+
+  async clearMedications() {
+    writeJson(STORAGE_KEYS.medications, [])
+  },
+
+  async getMonthlyBatches() {
+    return readArray(STORAGE_KEYS.monthlyBatches) ?? []
+  },
+
+  async saveMonthlyBatch(batch) {
+    const current = (await this.getMonthlyBatches()) ?? []
+    const next = [batch, ...current.filter((b) => b.id !== batch.id)]
+    writeJson(STORAGE_KEYS.monthlyBatches, next)
+    return batch
+  },
+
+  async getSelectedMonthlyBatchId() {
+    const raw = window.localStorage.getItem(STORAGE_KEYS.selectedMonthlyBatchId)
+    return raw ? safeJsonParse(raw) ?? raw : null
+  },
+
+  async setSelectedMonthlyBatchId(id) {
+    writeJson(STORAGE_KEYS.selectedMonthlyBatchId, id)
+  },
+}
+
