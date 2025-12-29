@@ -6,6 +6,7 @@ import {
   Menu,
   Package,
   Pill,
+  ClipboardList,
   Upload,
   X,
 } from 'lucide-react'
@@ -82,6 +83,14 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           id="consumption-summary"
           icon={BarChart3}
           label="Resumen consumo"
+          activeTab={activeTab}
+          isSidebarOpen={isSidebarOpen}
+          onSelect={onSelectTab}
+        />
+        <SidebarItem
+          id="order-request"
+          icon={ClipboardList}
+          label="Solicitud Pedido"
           activeTab={activeTab}
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}

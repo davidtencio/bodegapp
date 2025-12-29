@@ -9,6 +9,7 @@ import ConsumptionSummaryView from './views/ConsumptionSummaryView.jsx'
 import DashboardView from './views/DashboardView.jsx'
 import InventoryView from './views/InventoryView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
+import OrderRequestView from './views/OrderRequestView.jsx'
 import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
@@ -778,6 +779,8 @@ export default function BodegaApp() {
             status={monthlyStatus}
           />
         )}
+
+        {activeTab === 'order-request' && <OrderRequestView />}
 
         {activeTab === 'alerts' && (
           <AlertsView lowStockItems={lowStockItems} onEditMedication={openEditMedication} />
