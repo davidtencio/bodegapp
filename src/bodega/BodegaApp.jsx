@@ -26,6 +26,8 @@ export default function BodegaApp() {
   const [medications, setMedications] = useState([])
   const [inventorySearch, setInventorySearch] = useState('')
   const [inventoryType, setInventoryType] = useState('772')
+  const [inventoryPageSize, setInventoryPageSize] = useState(50)
+  const [inventoryPageByType, setInventoryPageByType] = useState({ '771': 1, '772': 1 })
 
   const [showAddMedModal, setShowAddMedModal] = useState(false)
   const [editingMed, setEditingMed] = useState(null)
@@ -124,6 +126,16 @@ export default function BodegaApp() {
       return haystack.includes(query)
     })
   }, [inventorySearch, medications, inventoryType])
+
+  const inventoryPage = inventoryPageByType?.[String(inventoryType || '772')] ?? 1
+
+  const paginatedInventory = useMemo(() => {
+    const size = inventoryPageSize || 50
+    const totalPages = Math.max(1, Math.ceil(filteredInventory.length / size))
+    const safePage = Math.min(Math.max(inventoryPage, 1), totalPages)
+    const start = (safePage - 1) * size
+    return filteredInventory.slice(start, start + size)
+  }, [filteredInventory, inventoryPage, inventoryPageSize])
 
   const inventoryCountForType = useMemo(() => {
     const selectedType = String(inventoryType || '772')
@@ -712,6 +724,7 @@ export default function BodegaApp() {
             onInventoryTypeChange={(type) => {
               setInventoryType(type)
               setInventorySearch('')
+              setInventoryPageByType((prev) => ({ ...prev, [String(type || '772')]: 1 }))
               setInventoryStatus({ loading: false, message: '', type: '' })
             }}
             inventoryStatus={inventoryStatus}
@@ -723,8 +736,23 @@ export default function BodegaApp() {
             canClear={inventoryCountForType > 0}
             onClearInventory={clearInventory}
             search={inventorySearch}
-            onSearchChange={setInventorySearch}
-            items={filteredInventory}
+            onSearchChange={(value) => {
+              setInventorySearch(value)
+              setInventoryPageByType((prev) => ({ ...prev, [String(inventoryType || '772')]: 1 }))
+            }}
+            items={paginatedInventory}
+            totalItems={filteredInventory.length}
+            page={inventoryPage}
+            pageSize={inventoryPageSize}
+            onPageChange={(nextPage) => {
+              const totalPages = Math.max(1, Math.ceil(filteredInventory.length / (inventoryPageSize || 1)))
+              const safe = Math.min(Math.max(Number(nextPage) || 1, 1), totalPages)
+              setInventoryPageByType((prev) => ({ ...prev, [String(inventoryType || '772')]: safe }))
+            }}
+            onPageSizeChange={(size) => {
+              setInventoryPageSize(size)
+              setInventoryPageByType((prev) => ({ ...prev, [String(inventoryType || '772')]: 1 }))
+            }}
           />
         )}
 

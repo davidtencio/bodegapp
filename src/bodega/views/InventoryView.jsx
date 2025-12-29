@@ -14,6 +14,11 @@ export default function InventoryView({
   search,
   onSearchChange,
   items,
+  totalItems,
+  page,
+  pageSize,
+  onPageChange,
+  onPageSizeChange,
 }) {
   const formatInventoryValue = (value) => {
     const asNumber = Number(value)
@@ -22,6 +27,13 @@ export default function InventoryView({
     }
     return String(value ?? '0')
   }
+
+  const total = Number(totalItems) || 0
+  const size = Number(pageSize) || 50
+  const totalPages = Math.max(1, Math.ceil(total / size))
+  const currentPage = Math.min(Math.max(Number(page) || 1, 1), totalPages)
+  const start = total === 0 ? 0 : (currentPage - 1) * size + 1
+  const end = Math.min(currentPage * size, total)
 
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
@@ -149,6 +161,45 @@ export default function InventoryView({
           )}
         </tbody>
       </table>
+
+      <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+        <div className="text-xs text-slate-500">{total === 0 ? '0 resultados' : `Mostrando ${start}-${end} de ${total}`}</div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <label className="text-xs text-slate-500">Filas</label>
+          <select
+            value={size}
+            onChange={(e) => onPageSizeChange?.(Number(e.target.value) || 50)}
+            className="border border-slate-200 rounded-lg px-2 py-1 text-xs bg-white"
+          >
+            {[25, 50, 100, 200].map((opt) => (
+              <option key={opt} value={opt}>
+                {opt}
+              </option>
+            ))}
+          </select>
+
+          <button
+            type="button"
+            onClick={() => onPageChange?.(currentPage - 1)}
+            disabled={currentPage <= 1}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+          >
+            Anterior
+          </button>
+          <span className="text-xs text-slate-600">
+            PÇ­gina {currentPage} de {totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => onPageChange?.(currentPage + 1)}
+            disabled={currentPage >= totalPages}
+            className="px-3 py-1.5 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 disabled:opacity-40 disabled:hover:bg-white"
+          >
+            Siguiente
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
