@@ -35,7 +35,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
         <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
           <div className="space-y-1">
             <h3 className="font-semibold text-slate-800">Resumen de consumo</h3>
-            <p className="text-xs text-slate-500">Muestra los 3 meses mÃ¡s recientes (segÃºn fecha de carga).</p>
+            <p className="text-xs text-slate-500">Muestra los 3 meses más recientes (según fecha de carga).</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -72,7 +72,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
               <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
                 <BarChart3 size={18} />
               </div>
-              <h3 className="font-bold text-slate-800">Ãšltimos 3 meses</h3>
+              <h3 className="font-bold text-slate-800">Últimos 3 meses</h3>
             </div>
             <span className="text-xs text-slate-500">{lastThree.length} meses</span>
           </div>
@@ -103,7 +103,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
 
         <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
           <div className="p-4 border-b border-slate-100 bg-slate-50">
-            <h3 className="font-bold text-slate-800">MÃ©tricas</h3>
+            <h3 className="font-bold text-slate-800">Métricas</h3>
           </div>
 
           <div className="p-4 space-y-3">
@@ -112,7 +112,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
               <span className="font-bold text-slate-800 tabular-nums">{formatNumber(avg)}</span>
             </div>
             <div className="flex justify-between items-center">
-              <span className="text-xs font-bold text-slate-500 uppercase">DesviaciÃ³n estÃ¡ndar</span>
+              <span className="text-xs font-bold text-slate-500 uppercase">Desviación estándar</span>
               <span className="font-bold text-slate-800 tabular-nums">{formatNumber(sd)}</span>
             </div>
             <div className="h-px bg-slate-100" />
@@ -129,4 +129,3 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
     </div>
   )
 }
-
