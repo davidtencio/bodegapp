@@ -87,6 +87,14 @@ export const localStore = {
     return readArray(STORAGE_KEYS.medications) ?? seedMedications
   },
 
+  async clearMedicationsByInventoryType(inventoryType) {
+    const selectedType = String(inventoryType || '772')
+    const current = (await this.getMedications()) ?? []
+    const next = current.filter((m) => String(m.inventory_type || '772') !== selectedType)
+    writeJson(STORAGE_KEYS.medications, next)
+    return next
+  },
+
   async upsertMedication(medication) {
     const current = (await this.getMedications()) ?? []
     const id = medication?.id

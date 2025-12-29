@@ -19,6 +19,13 @@ export const supabaseStore = {
     return data ?? []
   },
 
+  async clearMedicationsByInventoryType(inventoryType) {
+    const client = getRequiredSupabase()
+    const selectedType = String(inventoryType || '772')
+    const { error } = await client.from('medications').delete().eq('inventory_type', selectedType)
+    if (error) throw error
+  },
+
   async upsertMedication(medication) {
     const client = getRequiredSupabase()
     const payload = ensureId(medication)
@@ -97,4 +104,3 @@ export const supabaseStore = {
 
   async setSelectedMonthlyBatchId() {},
 }
-

@@ -119,6 +119,11 @@ export default function BodegaApp() {
     })
   }, [inventorySearch, medications, inventoryType])
 
+  const inventoryCountForType = useMemo(() => {
+    const selectedType = String(inventoryType || '772')
+    return medications.filter((m) => String(m.inventory_type || '772') === selectedType).length
+  }, [inventoryType, medications])
+
   const openNewMedication = () => {
     setEditingMed(null)
     setShowAddMedModal(true)
@@ -338,6 +343,32 @@ export default function BodegaApp() {
     e.target.value = null
   }
 
+  const clearInventory = async (type) => {
+    const selectedType = String(type || inventoryType || '772')
+    const ok = window.confirm(
+      `¿Desea eliminar toda la carga del inventario ${selectedType}? Esta acción no se puede deshacer.`,
+    )
+    if (!ok) return
+
+    try {
+      setInventoryStatus({ loading: true, message: `Eliminando inventario ${selectedType}...`, type: 'info' })
+      await store.clearMedicationsByInventoryType?.(selectedType)
+      await reloadMedications()
+      setInventoryStatus({
+        loading: false,
+        message: `Inventario ${selectedType} eliminado.`,
+        type: 'success',
+      })
+      window.setTimeout(() => setInventoryStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setInventoryStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'No se pudo eliminar el inventario.',
+        type: 'error',
+      })
+    }
+  }
+
   const deriveMonthLabelFromFilename = (filename) => {
     const base = String(filename || '')
       .replace(/\.[^/.]+$/, '')
@@ -495,6 +526,8 @@ export default function BodegaApp() {
             onChooseFile={() => inventoryFileInputRef.current?.click()}
             onFileChange={processInventoryCsv}
             onDownloadTemplate={downloadInventoryTemplateCsv}
+            canClear={inventoryCountForType > 0}
+            onClearInventory={clearInventory}
             search={inventorySearch}
             onSearchChange={setInventorySearch}
             items={filteredInventory}

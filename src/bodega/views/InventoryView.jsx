@@ -8,6 +8,8 @@ export default function InventoryView({
   onChooseFile,
   onFileChange,
   onDownloadTemplate,
+  canClear,
+  onClearInventory,
   search,
   onSearchChange,
   items,
@@ -58,6 +60,16 @@ export default function InventoryView({
             >
               <Download size={14} />
               Plantilla
+            </button>
+            <button
+              type="button"
+              onClick={() => onClearInventory?.(inventoryType)}
+              disabled={!canClear}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white"
+              title="Eliminar toda la carga de este inventario"
+            >
+              <Trash2 size={14} />
+              Eliminar carga
             </button>
           </div>
         </div>
