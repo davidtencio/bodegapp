@@ -177,14 +177,14 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
               <table className="w-full min-w-[1100px] text-left">
                 <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
                   <tr>
-                    <th className="px-4 py-4 whitespace-nowrap w-36">Código SIGES</th>
-                    <th className="px-4 py-4 whitespace-nowrap">Medicamento</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[2] ?? 'Mes 3'}</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[1] ?? 'Mes 2'}</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[0] ?? 'Mes 1'}</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-28">Promedio</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-28">Desv. Est.</th>
-                    <th className="px-3 py-4 text-right whitespace-nowrap w-36">Total (Prom.+Desv.)</th>
+                    <th className="px-4 py-4 whitespace-nowrap w-36 text-center">Código SIGES</th>
+                    <th className="px-4 py-4 whitespace-nowrap text-center">Medicamento</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[2] ?? 'Mes 3'}</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[1] ?? 'Mes 2'}</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[0] ?? 'Mes 1'}</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-28">Promedio</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-28">Desv. Est.</th>
+                    <th className="px-3 py-4 text-center whitespace-nowrap w-36">Total (Prom.+Desv.)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
