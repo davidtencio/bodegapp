@@ -72,7 +72,7 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
         <SidebarItem
           id="consumption-monthly"
           icon={Upload}
-          label="Consumo mensual (CSV)"
+          label="Consumo mensual"
           activeTab={activeTab}
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}
