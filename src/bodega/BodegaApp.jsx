@@ -17,7 +17,7 @@ import {
   readCsvAsRows,
 } from './csv.js'
 import { store } from './data/store.js'
-import { dataProvider, isSupabaseConfigured } from '../lib/supabaseClient.js'
+import { dataProvider, isSupabaseConfigured, supabaseProjectRef } from '../lib/supabaseClient.js'
 
 export default function BodegaApp() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -573,9 +573,21 @@ export default function BodegaApp() {
       const nextSelectedId = hasCurrent ? currentId : normalized?.[0]?.id ?? null
       selectMonthlyBatch(nextSelectedId)
 
+      const providerLabel =
+        dataProvider === 'supabase' && isSupabaseConfigured
+          ? `supabase${supabaseProjectRef ? ` (${supabaseProjectRef})` : ''}`
+          : `local${isSupabaseConfigured ? ' (Supabase disponible pero no seleccionado)' : ' (Supabase no configurado)'}`
+
+      const hint =
+        normalized.length === 0 && dataProvider === 'supabase' && isSupabaseConfigured
+          ? 'Si en Supabase ves meses cargados, revisa RLS/policies para `anon` (SELECT en `monthly_batches`).'
+          : normalized.length === 0
+            ? 'Si tus consumos están en Supabase, configura `VITE_SUPABASE_URL` y `VITE_SUPABASE_ANON_KEY` y usa `VITE_DATA_PROVIDER=supabase`.'
+            : ''
+
       setMonthlyStatus({
         loading: false,
-        message: `Sincronizado: ${normalized.length} meses encontrados.`,
+        message: `Sincronizado (${providerLabel}): ${normalized.length} meses encontrados.${hint ? ` ${hint}` : ''}`,
         type: 'success',
       })
       window.setTimeout(() => setMonthlyStatus({ loading: false, message: '', type: '' }), 4000)
