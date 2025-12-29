@@ -211,7 +211,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
           <>
             <div className="overflow-x-auto">
               <table className="w-full min-w-[1100px] text-left">
-                <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
+                <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[10px] uppercase font-bold shadow-sm">
                   <tr>
                     <th className="px-4 py-4 whitespace-nowrap w-36 text-center">Código SIGES</th>
                     <th className="px-4 py-4 whitespace-nowrap text-center">Medicamento</th>
