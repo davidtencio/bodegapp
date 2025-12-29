@@ -63,6 +63,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
   const monthLabels = lastThree.map((m) => String(m?.label ?? '').trim()).filter(Boolean)
 
   const [search, setSearch] = useState('')
+  const [hideNoConsumption, setHideNoConsumption] = useState(true)
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(1)
 
@@ -105,12 +106,13 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
 
   const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
+    const basePre = hideNoConsumption ? rows.filter((r) => toNumber(r.total) > 0) : rows
     const base = q
-      ? rows.filter((r) => {
+      ? basePre.filter((r) => {
           const haystack = `${r.siges_code} ${r.medication_name}`.toLowerCase()
           return haystack.includes(q)
         })
-      : rows
+      : basePre
 
     return base.sort((a, b) => {
       const codeA = a?.siges_code || ''
@@ -126,7 +128,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
 
       return String(codeA).localeCompare(String(codeB), 'es', { numeric: true, sensitivity: 'base' })
     })
-  }, [rows, search])
+  }, [hideNoConsumption, rows, search])
 
   const totalItems = filtered.length
   const safePageSize = Math.max(1, Number(pageSize) || 50)
@@ -180,6 +182,17 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              onClick={() => {
+                setHideNoConsumption((v) => !v)
+                setPage(1)
+              }}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm"
+              title="Oculta medicamentos con consumo 0 en los últimos 3 meses"
+            >
+              {hideNoConsumption ? 'Mostrar sin consumo' : 'Ocultar sin consumo'}
+            </button>
             <input
               value={search}
               onChange={(e) => {
