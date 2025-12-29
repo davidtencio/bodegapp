@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Download, Search, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, RefreshCcw, Search, Trash2, Upload } from 'lucide-react'
 
 export default function InventoryView({
   inventoryType,
@@ -8,6 +8,7 @@ export default function InventoryView({
   onChooseFile,
   onFileChange,
   onDownloadTemplate,
+  onRefresh,
   canClear,
   onClearInventory,
   search,
@@ -51,6 +52,15 @@ export default function InventoryView({
               accept=".csv"
               className="hidden"
             />
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2"
+              title="Sincronizar inventarios"
+            >
+              <RefreshCcw size={14} />
+              Sincronizar
+            </button>
             <button
               type="button"
               onClick={onChooseFile}

@@ -616,6 +616,41 @@ export default function BodegaApp() {
     }
   }
 
+  const refreshInventories = async () => {
+    try {
+      setInventoryStatus({ loading: true, message: 'Sincronizando inventarios...', type: 'info' })
+      const next = (await store.getMedications()) ?? []
+      setMedications(next)
+
+      const counts = next.reduce(
+        (acc, m) => {
+          const t = String(m.inventory_type || '772')
+          acc[t] = (acc[t] || 0) + 1
+          return acc
+        },
+        { '771': 0, '772': 0 },
+      )
+
+      const providerLabel =
+        dataProvider === 'supabase' && isSupabaseConfigured
+          ? `supabase${supabaseProjectRef ? ` (${supabaseProjectRef})` : ''}`
+          : 'local'
+
+      setInventoryStatus({
+        loading: false,
+        message: `Sincronizado (${providerLabel}): 771=${counts['771'] || 0}, 772=${counts['772'] || 0}.`,
+        type: 'success',
+      })
+      window.setTimeout(() => setInventoryStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setInventoryStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'No se pudieron sincronizar los inventarios.',
+        type: 'error',
+      })
+    }
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       <Sidebar
@@ -684,6 +719,7 @@ export default function BodegaApp() {
             onChooseFile={() => inventoryFileInputRef.current?.click()}
             onFileChange={processInventoryCsv}
             onDownloadTemplate={downloadInventoryTemplateCsv}
+            onRefresh={refreshInventories}
             canClear={inventoryCountForType > 0}
             onClearInventory={clearInventory}
             search={inventorySearch}
