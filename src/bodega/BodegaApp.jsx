@@ -561,6 +561,33 @@ export default function BodegaApp() {
     e.target.value = null
   }
 
+  const refreshMonthlyBatches = async () => {
+    try {
+      setMonthlyStatus({ loading: true, message: 'Sincronizando consumos...', type: 'info' })
+      const nextBatches = await store.getMonthlyBatches()
+      const normalized = (nextBatches ?? []).map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
+      setMonthlyBatches(normalized)
+
+      const currentId = selectedMonthlyBatchId != null ? String(selectedMonthlyBatchId) : null
+      const hasCurrent = currentId && normalized.some((b) => b.id === currentId)
+      const nextSelectedId = hasCurrent ? currentId : normalized?.[0]?.id ?? null
+      selectMonthlyBatch(nextSelectedId)
+
+      setMonthlyStatus({
+        loading: false,
+        message: `Sincronizado: ${normalized.length} meses encontrados.`,
+        type: 'success',
+      })
+      window.setTimeout(() => setMonthlyStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setMonthlyStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'No se pudieron sincronizar los consumos.',
+        type: 'error',
+      })
+    }
+  }
+
   return (
     <div className="flex h-screen bg-slate-50 font-sans text-slate-900 overflow-hidden">
       <Sidebar
@@ -647,6 +674,7 @@ export default function BodegaApp() {
             onChooseFile={() => monthlyFileInputRef.current?.click()}
             onFileChange={processMonthlyConsumptionCsv}
             onDownloadTemplate={downloadMonthlyConsumptionTemplateCsv}
+            onRefresh={refreshMonthlyBatches}
           />
         )}
 

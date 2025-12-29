@@ -1,4 +1,4 @@
-import { FileDown, Upload } from 'lucide-react'
+import { FileDown, RefreshCcw, Upload } from 'lucide-react'
 
 function StatusBanner({ status }) {
   if (!status?.message) return null
@@ -26,6 +26,7 @@ export default function MonthlyConsumptionView({
   onChooseFile,
   onFileChange,
   onDownloadTemplate,
+  onRefresh,
 }) {
   const selected = months.find((m) => m.id === selectedMonthId) || null
 
@@ -67,6 +68,14 @@ export default function MonthlyConsumptionView({
             >
               <FileDown size={16} />
               Descargar plantilla
+            </button>
+            <button
+              type="button"
+              onClick={onRefresh}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-2"
+            >
+              <RefreshCcw size={16} />
+              Sincronizar
             </button>
             <button
               type="button"
