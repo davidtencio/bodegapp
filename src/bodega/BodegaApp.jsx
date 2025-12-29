@@ -13,6 +13,7 @@ import OrderRequestView from './views/OrderRequestView.jsx'
 import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
+  downloadInventoryTemplateXml,
   downloadMonthlyConsumptionTemplateCsv,
   normalizeDateInput,
   readCsvAsJson,
@@ -124,7 +125,7 @@ export default function BodegaApp() {
     const query = inventorySearch.trim().toLowerCase()
     if (!query) return base
     return base.filter((m) => {
-      const haystack = `${m.name} ${m.category} ${m.batch} ${m.unit}`.toLowerCase()
+      const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
       return haystack.includes(query)
     })
   }, [inventorySearch, medications, inventoryType])
@@ -248,6 +249,178 @@ export default function BodegaApp() {
 
     const num = Number.parseFloat(normalized)
     return Number.isFinite(num) ? num : 0
+  }
+
+  const normalizeDateFromXml = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return null
+
+    const dateOnly = raw.slice(0, 10)
+    if (/^\d{4}-\d{2}-\d{2}$/.test(dateOnly)) return dateOnly
+
+    const yyyymmdd = raw.replace(/\D/g, '')
+    if (yyyymmdd.length === 8) {
+      const yyyy = yyyymmdd.slice(0, 4)
+      const mm = yyyymmdd.slice(4, 6)
+      const dd = yyyymmdd.slice(6, 8)
+      return `${yyyy}-${mm}-${dd}`
+    }
+
+    const dmy = raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/)
+    if (dmy) {
+      const dd = dmy[1].padStart(2, '0')
+      const mm = dmy[2].padStart(2, '0')
+      const yyyy = dmy[3]
+      return `${yyyy}-${mm}-${dd}`
+    }
+
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) return parsed.toISOString().slice(0, 10)
+    return null
+  }
+
+  const getXmlValue = (element, tagNames, attrNames = []) => {
+    if (!element) return ''
+
+    for (const tagName of tagNames) {
+      const node = element.getElementsByTagName(tagName)?.[0]
+      const value = node?.textContent != null ? String(node.textContent).trim() : ''
+      if (value) return value
+    }
+
+    for (const attrName of attrNames) {
+      const value = element.getAttribute?.(attrName)
+      if (value != null && String(value).trim()) return String(value).trim()
+    }
+
+    return ''
+  }
+
+  const parseInventory771Xml = (xmlText) => {
+    const parser = new DOMParser()
+    const doc = parser.parseFromString(String(xmlText || ''), 'application/xml')
+    if (doc.querySelector('parsererror')) throw new Error('XML inválido o mal formado.')
+
+    const codeTags = [
+      'CodigoSIGES',
+      'CodigoSiges',
+      'codigoSIGES',
+      'codigoSiges',
+      'Codigo',
+      'codigo',
+      'SIGES',
+      'Siges',
+      'siges_code',
+    ]
+    const nameTags = ['Medicamento', 'medicamento', 'Nombre', 'nombre', 'Descripcion', 'descripcion', 'Medication']
+    const lotTags = ['Lote', 'lote', 'Batch', 'batch', 'LoteMedicamento', 'loteMedicamento']
+    const expiryTags = [
+      'Vencimiento',
+      'vencimiento',
+      'FechaVencimiento',
+      'fechaVencimiento',
+      'FechaCaducidad',
+      'fechaCaducidad',
+      'expiry_date',
+      'ExpiryDate',
+    ]
+    const stockTags = ['Inventario', 'inventario', 'Stock', 'stock', 'Existencia', 'existencia', 'Cantidad', 'cantidad']
+
+    const recordElements = new Set()
+    for (const tagName of codeTags) {
+      const nodes = doc.getElementsByTagName(tagName)
+      for (const node of nodes) {
+        let el = node.parentElement
+        let hops = 0
+        while (el && el !== doc.documentElement && hops < 6) {
+          const hasLot = Boolean(getXmlValue(el, lotTags, ['lote', 'Lote', 'batch', 'Batch']))
+          const hasExpiry = Boolean(getXmlValue(el, expiryTags, ['vencimiento', 'Vencimiento', 'expiry', 'Expiry']))
+          const hasStock = Boolean(getXmlValue(el, stockTags, ['inventario', 'Inventario', 'stock', 'Stock']))
+          if (hasLot || hasExpiry || hasStock) break
+          el = el.parentElement
+          hops += 1
+        }
+        if (el) recordElements.add(el)
+      }
+    }
+
+    const records = []
+    for (const el of recordElements) {
+      const siges_code = getXmlValue(el, codeTags, ['CodigoSIGES', 'codigoSIGES', 'siges_code', 'Codigo', 'codigo'])
+      const name = getXmlValue(el, nameTags, ['Medicamento', 'medicamento', 'Nombre', 'nombre']).trim()
+      const batch = getXmlValue(el, lotTags, ['Lote', 'lote', 'Batch', 'batch']).trim()
+      const expiryRaw = getXmlValue(el, expiryTags, ['Vencimiento', 'vencimiento', 'ExpiryDate', 'expiry_date']).trim()
+      const stockRaw = getXmlValue(el, stockTags, ['Inventario', 'inventario', 'Stock', 'stock']).trim()
+
+      if (!siges_code || !name) continue
+
+      records.push({
+        siges_code: String(siges_code).trim(),
+        name: name || 'Sin nombre',
+        batch: batch || 'S/N',
+        expiry_date: normalizeDateFromXml(expiryRaw),
+        stock: parseInventoryNumber(stockRaw),
+      })
+    }
+
+    return records
+  }
+
+  const makeLotKey = ({ siges_code, name, batch, expiry_date }) => {
+    const code = String(siges_code || '').trim()
+    const normalizedName = String(name || '').trim().toLowerCase()
+    const lot = String(batch || '').trim().toLowerCase()
+    const expiry = expiry_date ? String(expiry_date).trim() : ''
+    if (code) return `code:${code}|lot:${lot}|exp:${expiry}`
+    return `name:${normalizedName}|lot:${lot}|exp:${expiry}`
+  }
+
+  const upsertInventory771FromXmlText = async ({ text }) => {
+    const selectedType = '771'
+    const records = parseInventory771Xml(text)
+
+    const current = (await store.getMedications()) ?? []
+    const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
+    const byKeyToId = new Map(
+      existingForType
+        .map((m) => [makeLotKey(m), m.id])
+        .filter(([key]) => Boolean(key)),
+    )
+
+    const now = Date.now()
+    const imported = records.map((r, index) => {
+      const key = makeLotKey(r)
+      const existingId = byKeyToId.get(key)
+      const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
+
+      return {
+        id,
+        inventory_type: selectedType,
+        siges_code: r.siges_code,
+        sicop_classifier: '',
+        sicop_identifier: '',
+        name: r.name,
+        category: 'General',
+        batch: r.batch || 'S/N',
+        expiry_date: r.expiry_date,
+        stock: r.stock,
+        min_stock: 0,
+        unit: 'Unidad',
+      }
+    })
+
+    await store.upsertMedications(imported)
+
+    const after = (await store.getMedications()) ?? []
+    const visibleCountForType = after.filter((m) => String(m.inventory_type || '772') === selectedType).length
+    const totalCountByType = after.reduce((acc, m) => {
+      const t = String(m.inventory_type || '772')
+      acc[t] = (acc[t] || 0) + 1
+      return acc
+    }, {})
+
+    await reloadMedications()
+    return { importedCount: imported.length, visibleCountForType, totalCountByType }
   }
 
   const looksLikeInventoryHeaderRow = (row) => {
@@ -427,11 +600,32 @@ export default function BodegaApp() {
     e.target.value = null
   }
 
-  const processInventoryCsv = (e) => {
+  const downloadInventoryTemplate = (type) => {
+    const selectedType = String(type || inventoryType || '772')
+    if (selectedType === '771') return downloadInventoryTemplateXml(selectedType)
+    return downloadInventoryTemplateCsv(selectedType)
+  }
+
+  const processInventoryFile = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
     const selectedType = String(inventoryType || '772')
+    const filename = String(file.name || '').toLowerCase()
+    const isXml = filename.endsWith('.xml')
+    const isCsv = filename.endsWith('.csv')
+
+    if (selectedType === '771' && !isXml) {
+      setInventoryStatus({ loading: false, message: 'Para inventario 771, selecciona un archivo .xml.', type: 'error' })
+      e.target.value = null
+      return
+    }
+    if (selectedType !== '771' && !isCsv) {
+      setInventoryStatus({ loading: false, message: 'Para inventario 772, selecciona un archivo .csv.', type: 'error' })
+      e.target.value = null
+      return
+    }
+
     setInventoryStatus({
       loading: true,
       message: `Procesando inventario ${selectedType}: ${file.name}`,
@@ -445,7 +639,10 @@ export default function BodegaApp() {
     reader.onload = async (evt) => {
       try {
         const text = String(evt.target?.result || '')
-        const result = await upsertInventoryFromCsvText({ text, type: selectedType })
+        const result =
+          selectedType === '771'
+            ? await upsertInventory771FromXmlText({ text })
+            : await upsertInventoryFromCsvText({ text, type: selectedType })
         const importedCount = result?.importedCount ?? 0
         const visibleCountForType = result?.visibleCountForType ?? 0
 
@@ -467,7 +664,10 @@ export default function BodegaApp() {
           : ''
         setInventoryStatus({
           loading: false,
-          message: extraHint ? `${rawMessage}. ${extraHint}` : rawMessage || 'Error al procesar/guardar el CSV.',
+          message:
+            extraHint
+              ? `${rawMessage}. ${extraHint}`
+              : rawMessage || `Error al procesar/guardar el ${selectedType === '771' ? 'XML' : 'CSV'}.`,
           type: 'error',
         })
       }
@@ -732,8 +932,8 @@ export default function BodegaApp() {
             inventoryStatus={inventoryStatus}
             fileInputRef={inventoryFileInputRef}
             onChooseFile={() => inventoryFileInputRef.current?.click()}
-            onFileChange={processInventoryCsv}
-            onDownloadTemplate={downloadInventoryTemplateCsv}
+            onFileChange={processInventoryFile}
+            onDownloadTemplate={downloadInventoryTemplate}
             onRefresh={refreshInventories}
             canClear={inventoryCountForType > 0}
             onClearInventory={clearInventory}

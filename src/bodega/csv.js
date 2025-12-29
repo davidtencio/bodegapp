@@ -258,3 +258,29 @@ export function downloadInventoryTemplateCsv(inventoryType) {
   a.remove()
   URL.revokeObjectURL(url)
 }
+
+export function downloadInventoryTemplateXml(inventoryType) {
+  const type = String(inventoryType || '771').trim() || '771'
+
+  const xml = `<?xml version="1.0" encoding="UTF-8"?>
+<Inventario tipo="${type}">
+  <Item>
+    <CodigoSIGES>110-16-0010</CodigoSIGES>
+    <Medicamento>Paracetamol</Medicamento>
+    <Lote>LOT-2025-01</Lote>
+    <Vencimiento>2027-12-31</Vencimiento>
+    <Inventario>100</Inventario>
+  </Item>
+</Inventario>
+`
+
+  const blob = new Blob([xml], { type: 'application/xml;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `plantilla_inventario_${type}.xml`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

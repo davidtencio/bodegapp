@@ -20,11 +20,11 @@ export default function InventoryView({
   onPageChange,
   onPageSizeChange,
 }) {
+  const is771 = String(inventoryType || '772') === '771'
+
   const formatInventoryValue = (value) => {
     const asNumber = Number(value)
-    if (Number.isFinite(asNumber)) {
-      return asNumber.toLocaleString('en-US', { maximumFractionDigits: 2 })
-    }
+    if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { maximumFractionDigits: 2 })
     return String(value ?? '0')
   }
 
@@ -61,7 +61,7 @@ export default function InventoryView({
               type="file"
               ref={fileInputRef}
               onChange={onFileChange}
-              accept=".csv"
+              accept={is771 ? '.xml' : '.csv'}
               className="hidden"
             />
             <button
@@ -79,7 +79,7 @@ export default function InventoryView({
               className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
             >
               <Upload size={14} />
-              Cargar CSV
+              {is771 ? 'Cargar XML' : 'Cargar CSV'}
             </button>
             <button
               type="button"
@@ -112,11 +112,7 @@ export default function InventoryView({
                   : 'bg-blue-50 text-blue-700 border border-blue-100'
             }`}
           >
-            {inventoryStatus.type === 'success' ? (
-              <CheckCircle2 size={16} />
-            ) : (
-              <AlertTriangle size={16} />
-            )}
+            {inventoryStatus.type === 'success' ? <CheckCircle2 size={16} /> : <AlertTriangle size={16} />}
             <span>{inventoryStatus.message}</span>
           </div>
         )}
@@ -132,11 +128,14 @@ export default function InventoryView({
           />
         </div>
       </div>
+
       <table className="w-full text-left">
         <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
           <tr>
             <th className="px-6 py-4 text-center">Código SIGES</th>
             <th className="px-6 py-4">Medicamento</th>
+            {is771 && <th className="px-6 py-4 text-center">Lote</th>}
+            {is771 && <th className="px-6 py-4 text-center">Vencimiento</th>}
             <th className="px-6 py-4 text-center">Inventario</th>
           </tr>
         </thead>
@@ -147,6 +146,12 @@ export default function InventoryView({
               <td className="px-6 py-4">
                 <span className="font-medium text-slate-700">{item.name}</span>
               </td>
+              {is771 && (
+                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center">{item.batch || ''}</td>
+              )}
+              {is771 && (
+                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center">{item.expiry_date || ''}</td>
+              )}
               <td className="px-6 py-4 text-center">
                 <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
               </td>
@@ -154,7 +159,7 @@ export default function InventoryView({
           ))}
           {items.length === 0 && (
             <tr>
-              <td colSpan={3} className="px-6 py-10 text-center text-sm text-slate-400">
+              <td colSpan={is771 ? 5 : 3} className="px-6 py-10 text-center text-sm text-slate-400">
                 No hay resultados para “{search}”.
               </td>
             </tr>
@@ -188,7 +193,7 @@ export default function InventoryView({
             Anterior
           </button>
           <span className="text-xs text-slate-600">
-            PÇ­gina {currentPage} de {totalPages}
+            Página {currentPage} de {totalPages}
           </span>
           <button
             type="button"
@@ -203,3 +208,4 @@ export default function InventoryView({
     </div>
   )
 }
+
