@@ -31,6 +31,16 @@ function buildMedicationKey({ siges_code, medication_name }) {
   return name ? `name:${name}` : ''
 }
 
+function extractLast4DigitsNumber(code) {
+  const digits = String(code || '').replace(/\D/g, '')
+  if (digits.length < 4) return Number.POSITIVE_INFINITY
+  return Number.parseInt(digits.slice(-4), 10)
+}
+
+function startsWith110(code) {
+  return String(code || '').trim().startsWith('110')
+}
+
 function StatusBanner({ status }) {
   if (!status?.message) return null
 
@@ -102,7 +112,20 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
         })
       : rows
 
-    return base.sort((a, b) => b.total - a.total)
+    return base.sort((a, b) => {
+      const codeA = a?.siges_code || ''
+      const codeB = b?.siges_code || ''
+
+      const a110 = startsWith110(codeA)
+      const b110 = startsWith110(codeB)
+      if (a110 !== b110) return a110 ? -1 : 1
+
+      const suffixA = extractLast4DigitsNumber(codeA)
+      const suffixB = extractLast4DigitsNumber(codeB)
+      if (suffixA !== suffixB) return suffixA - suffixB
+
+      return String(codeA).localeCompare(String(codeB), 'es', { numeric: true, sensitivity: 'base' })
+    })
   }, [rows, search])
 
   const totalItems = filtered.length
