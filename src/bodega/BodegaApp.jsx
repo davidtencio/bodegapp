@@ -344,8 +344,17 @@ export default function BodegaApp() {
     const combined = hasThreeColumns ? importedMeds : importedFromJson
 
     await store.upsertMedications(combined)
+
+    const after = (await store.getMedications()) ?? []
+    const visibleCountForType = after.filter((m) => String(m.inventory_type || '772') === selectedType).length
+    const totalCountByType = after.reduce((acc, m) => {
+      const t = String(m.inventory_type || '772')
+      acc[t] = (acc[t] || 0) + 1
+      return acc
+    }, {})
+
     await reloadMedications()
-    return combined.length
+    return { importedCount: combined.length, visibleCountForType, totalCountByType }
   }
 
   const processCsv = (e) => {
@@ -422,10 +431,17 @@ export default function BodegaApp() {
     reader.onload = async (evt) => {
       try {
         const text = String(evt.target?.result || '')
-        const count = await upsertInventoryFromCsvText({ text, type: selectedType })
+        const result = await upsertInventoryFromCsvText({ text, type: selectedType })
+        const importedCount = result?.importedCount ?? 0
+        const visibleCountForType = result?.visibleCountForType ?? 0
+
+        const hint =
+          importedCount > 0 && visibleCountForType === 0 && dataProvider === 'supabase' && isSupabaseConfigured
+            ? 'Importó datos pero no se pueden listar. Revisa RLS/policies en Supabase para `medications` (SELECT/ALL para `anon`).'
+            : ''
         setInventoryStatus({
           loading: false,
-          message: `Inventario ${selectedType}: ${count} medicamentos importados/actualizados.`,
+          message: `Inventario ${selectedType}: ${importedCount} medicamentos importados/actualizados.${hint ? ` ${hint}` : ''}`,
           type: 'success',
         })
         window.setTimeout(() => setInventoryStatus({ loading: false, message: '', type: '' }), 4000)
