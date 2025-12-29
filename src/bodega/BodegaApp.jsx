@@ -152,8 +152,8 @@ export default function BodegaApp() {
       category: String(formData.get('category') || '').trim(),
       batch: String(formData.get('batch') || '').trim(),
       expiry_date: String(formData.get('expiry_date') || '').trim(),
-      stock: Number.parseInt(String(formData.get('stock') || '0'), 10) || 0,
-      min_stock: Number.parseInt(String(formData.get('min_stock') || '0'), 10) || 0,
+      stock: Number.parseFloat(String(formData.get('stock') || '0')) || 0,
+      min_stock: Number.parseFloat(String(formData.get('min_stock') || '0')) || 0,
       unit: String(formData.get('unit') || '').trim(),
     }
 
@@ -211,9 +211,60 @@ export default function BodegaApp() {
     return ''
   }
 
+  const parseInventoryNumber = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return 0
+
+    const compact = raw.replace(/\s/g, '')
+    const hasComma = compact.includes(',')
+    const hasDot = compact.includes('.')
+
+    let normalized = compact
+    if (hasComma && hasDot) {
+      normalized = compact.replace(/,/g, '')
+    } else if (hasComma && !hasDot) {
+      normalized = compact.replace(/,/g, '.')
+    }
+
+    const num = Number.parseFloat(normalized)
+    return Number.isFinite(num) ? num : 0
+  }
+
+  const looksLikeInventoryHeaderRow = (row) => {
+    const normalized = (cell) =>
+      String(cell ?? '')
+        .trim()
+        .toLowerCase()
+        .normalize('NFD')
+        .replace(/[\u0300-\u036f]/g, '')
+        .replace(/[^a-z0-9]/g, '')
+
+    const a = normalized(row?.[0])
+    const b = normalized(row?.[1])
+    const c = normalized(row?.[2])
+    return (
+      a.includes('siges') ||
+      a.includes('codigosiges') ||
+      b.includes('medicamento') ||
+      b.includes('nombre') ||
+      c.includes('inventario') ||
+      c.includes('stock')
+    )
+  }
+
   const upsertInventoryFromCsvText = async ({ text, type }) => {
     const selectedType = String(type || '772').trim() || '772'
-    const data = readCsvAsJson(text)
+
+    const rows = readCsvAsRows(text)
+    const dataRows = looksLikeInventoryHeaderRow(rows?.[0]) ? rows.slice(1) : rows
+
+    const hasThreeColumns = dataRows.some((row) => {
+      const siges = String(row?.[0] ?? '').trim()
+      const name = String(row?.[1] ?? '').trim()
+      return Boolean(siges && name)
+    })
+
+    const data = hasThreeColumns ? null : readCsvAsJson(text)
 
     const current = (await store.getMedications()) ?? []
     const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
@@ -224,8 +275,41 @@ export default function BodegaApp() {
     )
 
     const now = Date.now()
-    const importedMeds = data
+    const importedMeds = (dataRows ?? [])
       .map((row, index) => {
+        if (!hasThreeColumns) return null
+
+        const siges_code = String(row?.[0] ?? '').trim()
+        const name = String(row?.[1] ?? '').trim()
+        if (!siges_code || !name) return null
+
+        const key = makeMedicationKey({ siges_code, name })
+        if (!key) return null
+
+        const existingId = byKeyToId.get(key)
+        const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
+
+        return {
+          id,
+          inventory_type: selectedType,
+          siges_code,
+          sicop_classifier: '',
+          sicop_identifier: '',
+          name,
+          category: 'General',
+          batch: 'S/N',
+          expiry_date: normalizeDateInput(''),
+          stock: parseInventoryNumber(row?.[2]),
+          min_stock: 0,
+          unit: 'Unidad',
+        }
+      })
+      .filter(Boolean)
+
+    const importedFromJson = (data ?? [])
+      .map((row, index) => {
+        if (hasThreeColumns) return null
+
         const siges_code = String(row.CodigoSIGES || '').trim()
         const name = String(row.Medicamento || row.Nombre || '').trim()
         const key = makeMedicationKey({ siges_code, name })
@@ -244,16 +328,18 @@ export default function BodegaApp() {
           category: String(row.Categoria || 'General').trim() || 'General',
           batch: String(row.Lote || 'S/N').trim() || 'S/N',
           expiry_date: normalizeDateInput(row.Vencimiento),
-          stock: Number.parseInt(String(row.Stock || 0), 10) || 0,
-          min_stock: Number.parseInt(String(row.StockMinimo || 10), 10) || 10,
+          stock: parseInventoryNumber(row.Stock),
+          min_stock: parseInventoryNumber(row.StockMinimo || 0),
           unit: String(row.Unidad || 'Unidad').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
 
-    await store.upsertMedications(importedMeds)
+    const combined = hasThreeColumns ? importedMeds : importedFromJson
+
+    await store.upsertMedications(combined)
     await reloadMedications()
-    return importedMeds.length
+    return combined.length
   }
 
   const processCsv = (e) => {
@@ -274,6 +360,7 @@ export default function BodegaApp() {
         const now = Date.now()
         const importedMeds = data.map((row, index) => ({
           id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index,
+          inventory_type: '772',
           siges_code: String(row.CodigoSIGES || '').trim(),
           sicop_classifier: String(row.ClasificadorSICOP || '').trim(),
           sicop_identifier: String(row.IdentificadorSICOP || '').trim(),
@@ -281,8 +368,8 @@ export default function BodegaApp() {
           category: row.Categoria || 'General',
           batch: row.Lote || 'S/N',
           expiry_date: normalizeDateInput(row.Vencimiento),
-          stock: Number.parseInt(String(row.Stock || 0), 10) || 0,
-          min_stock: Number.parseInt(String(row.StockMinimo || 10), 10) || 10,
+          stock: parseInventoryNumber(row.Stock),
+          min_stock: parseInventoryNumber(row.StockMinimo || 10),
           unit: row.Unidad || 'Unidad',
         }))
 

@@ -25,8 +25,8 @@ create table if not exists public.medications (
   category text,
   batch text,
   expiry_date date,
-  stock integer not null default 0,
-  min_stock integer not null default 0,
+  stock numeric not null default 0,
+  min_stock numeric not null default 0,
   unit text,
   created_at timestamptz not null default now(),
   updated_at timestamptz not null default now()
@@ -35,6 +35,12 @@ create table if not exists public.medications (
 -- Migracion segura si ya existia la tabla
 alter table if exists public.medications
   add column if not exists inventory_type text not null default '772';
+
+alter table if exists public.medications
+  alter column stock type numeric using stock::numeric;
+
+alter table if exists public.medications
+  alter column min_stock type numeric using min_stock::numeric;
 
 drop trigger if exists trg_medications_updated_at on public.medications;
 create trigger trg_medications_updated_at
