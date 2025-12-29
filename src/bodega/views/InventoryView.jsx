@@ -113,19 +113,19 @@ export default function InventoryView({
       <table className="w-full text-left">
         <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
           <tr>
-            <th className="px-6 py-4">Código SIGES</th>
+            <th className="px-6 py-4 text-center">Código SIGES</th>
             <th className="px-6 py-4">Medicamento</th>
-            <th className="px-6 py-4 text-right">Inventario</th>
+            <th className="px-6 py-4 text-center">Inventario</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
             <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-              <td className="px-6 py-4 text-sm text-slate-700 font-mono">{item.siges_code || ''}</td>
+              <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center">{item.siges_code || ''}</td>
               <td className="px-6 py-4">
                 <span className="font-medium text-slate-700">{item.name}</span>
               </td>
-              <td className="px-6 py-4 text-right">
+              <td className="px-6 py-4 text-center">
                 <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
               </td>
             </tr>
