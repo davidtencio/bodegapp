@@ -251,6 +251,18 @@ export default function BodegaApp() {
     return Number.isFinite(num) ? num : 0
   }
 
+  const normalizeSigesCode = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return ''
+
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length === 9) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`
+    }
+
+    return raw.replace(/\s+/g, ' ')
+  }
+
   const normalizeDateFromXml = (value) => {
     const raw = String(value ?? '').trim()
     if (!raw) return null
@@ -296,10 +308,75 @@ export default function BodegaApp() {
     return ''
   }
 
+  const parseInventory771CrystalReportXml = (doc) => {
+    const areaPairs = Array.from(doc.getElementsByTagNameNS('*', 'FormattedAreaPair'))
+    const groups = areaPairs.filter(
+      (pair) => pair.getAttribute('Level') === '4' && pair.getAttribute('Type') === 'Group',
+    )
+    if (!groups.length) return null
+
+    const readFieldValue = (root, matcher) => {
+      const objects = Array.from(root.getElementsByTagNameNS('*', 'FormattedReportObject'))
+      for (const obj of objects) {
+        const fieldName = obj.getAttribute?.('FieldName')
+        if (!fieldName) continue
+        if (!matcher(fieldName)) continue
+
+        const valueNode = obj.getElementsByTagNameNS('*', 'Value')?.[0]
+        const formattedNode = obj.getElementsByTagNameNS('*', 'FormattedValue')?.[0]
+        const raw =
+          (valueNode?.textContent != null ? String(valueNode.textContent) : '') ||
+          (formattedNode?.textContent != null ? String(formattedNode.textContent) : '')
+        const value = raw.trim()
+        if (value) return value
+      }
+      return ''
+    }
+
+    const fieldIncludes = (snippet) => (fieldName) => String(fieldName).includes(snippet)
+
+    const records = []
+    for (const group of groups) {
+      const codeRaw = readFieldValue(group, fieldIncludes('.PRODUCTO}'))
+      const nameRaw = readFieldValue(group, fieldIncludes('.DSC_PRODUCTO}'))
+      const siges_code = normalizeSigesCode(codeRaw)
+      const name = String(nameRaw || '').trim()
+      if (!siges_code || !name) continue
+
+      const details = Array.from(group.getElementsByTagNameNS('*', 'FormattedAreaPair')).filter(
+        (pair) => pair.getAttribute('Level') === '5' && pair.getAttribute('Type') === 'Details',
+      )
+
+      for (const detail of details) {
+        const batch = readFieldValue(detail, fieldIncludes('.IDE_LOTE}')) || 'S/N'
+        const stockRaw = readFieldValue(detail, fieldIncludes('.CAN_LOTE}')) || '0'
+        const expiryRaw = readFieldValue(detail, fieldIncludes('.FEC_VENCIMIENTO}'))
+
+        const stock = parseInventoryNumber(stockRaw)
+        const expiry_date = normalizeDateFromXml(expiryRaw)
+
+        if (!batch && !expiryRaw && stock === 0) continue
+
+        records.push({
+          siges_code,
+          name,
+          batch: String(batch).trim() || 'S/N',
+          expiry_date,
+          stock,
+        })
+      }
+    }
+
+    return records
+  }
+
   const parseInventory771Xml = (xmlText) => {
     const parser = new DOMParser()
     const doc = parser.parseFromString(String(xmlText || ''), 'application/xml')
     if (doc.querySelector('parsererror')) throw new Error('XML inválido o mal formado.')
+
+    const crystalRecords = parseInventory771CrystalReportXml(doc)
+    if (Array.isArray(crystalRecords)) return crystalRecords
 
     const codeTags = [
       'CodigoSIGES',
@@ -355,7 +432,7 @@ export default function BodegaApp() {
       if (!siges_code || !name) continue
 
       records.push({
-        siges_code: String(siges_code).trim(),
+        siges_code: normalizeSigesCode(siges_code),
         name: name || 'Sin nombre',
         batch: batch || 'S/N',
         expiry_date: normalizeDateFromXml(expiryRaw),
@@ -378,6 +455,14 @@ export default function BodegaApp() {
   const upsertInventory771FromXmlText = async ({ text }) => {
     const selectedType = '771'
     const records = parseInventory771Xml(text)
+    const uniqueRecords = []
+    const seenKeys = new Set()
+    for (const record of records) {
+      const key = makeLotKey(record)
+      if (!key || seenKeys.has(key)) continue
+      seenKeys.add(key)
+      uniqueRecords.push(record)
+    }
 
     const current = (await store.getMedications()) ?? []
     const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
@@ -388,7 +473,7 @@ export default function BodegaApp() {
     )
 
     const now = Date.now()
-    const imported = records.map((r, index) => {
+    const imported = uniqueRecords.map((r, index) => {
       const key = makeLotKey(r)
       const existingId = byKeyToId.get(key)
       const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
