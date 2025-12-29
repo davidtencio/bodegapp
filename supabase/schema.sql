@@ -17,6 +17,7 @@ $$;
 -- Catálogo / inventario
 create table if not exists public.medications (
   id uuid primary key default gen_random_uuid(),
+  inventory_type text not null default '772',
   siges_code text,
   sicop_classifier text,
   sicop_identifier text,
@@ -31,6 +32,10 @@ create table if not exists public.medications (
   updated_at timestamptz not null default now()
 );
 
+-- Migracion segura si ya existia la tabla
+alter table if exists public.medications
+  add column if not exists inventory_type text not null default '772';
+
 drop trigger if exists trg_medications_updated_at on public.medications;
 create trigger trg_medications_updated_at
 before update on public.medications
@@ -38,6 +43,7 @@ for each row execute function public.set_updated_at();
 
 create index if not exists idx_medications_siges_code on public.medications (siges_code);
 create index if not exists idx_medications_name on public.medications (name);
+create index if not exists idx_medications_inventory_type on public.medications (inventory_type);
 
 -- Consumo mensual
 create table if not exists public.monthly_batches (

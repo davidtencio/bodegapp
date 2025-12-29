@@ -224,3 +224,37 @@ export function readCsvAsJson(text) {
     return record
   })
 }
+
+export function downloadInventoryTemplateCsv(inventoryType) {
+  const type = String(inventoryType || '772').trim() || '772'
+  const delimiter = ';'
+  const headers = [
+    'CodigoSIGES',
+    'ClasificadorSICOP',
+    'IdentificadorSICOP',
+    'Medicamento',
+    'Categoria',
+    'Lote',
+    'Vencimiento',
+    'Stock',
+    'StockMinimo',
+    'Unidad',
+  ]
+  const example = ['SIG-0001', 'SICOP-CL-01', 'SICOP-ID-0001', 'Paracetamol', 'General', 'LOT-2025-01', '2027-12-31', 100, 20, 'Tabletas']
+
+  const lines = [
+    headers.map((v) => escapeCsvValue(v, delimiter)).join(delimiter),
+    example.map((v) => escapeCsvValue(v, delimiter)).join(delimiter),
+  ]
+
+  const csv = `\uFEFF${lines.join('\n')}\n`
+  const blob = new Blob([csv], { type: 'text/csv;charset=utf-8' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = `plantilla_inventario_${type}.csv`
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}

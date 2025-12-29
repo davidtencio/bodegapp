@@ -1,6 +1,13 @@
-import { Edit2, Pill, Search, Trash2 } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, Edit2, Pill, Search, Trash2, Upload } from 'lucide-react'
 
 export default function InventoryView({
+  inventoryType,
+  onInventoryTypeChange,
+  inventoryStatus,
+  fileInputRef,
+  onChooseFile,
+  onFileChange,
+  onDownloadTemplate,
   search,
   onSearchChange,
   items,
@@ -9,7 +16,71 @@ export default function InventoryView({
 }) {
   return (
     <div className="bg-white rounded-xl border border-slate-200 shadow-sm overflow-hidden">
-      <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+      <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
+        <div className="flex flex-wrap gap-3 items-center justify-between">
+          <div className="flex items-center gap-2">
+            {['772', '771'].map((type) => (
+              <button
+                key={type}
+                type="button"
+                onClick={() => onInventoryTypeChange?.(type)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
+                  String(inventoryType || '772') === type
+                    ? 'bg-blue-600 text-white border-blue-600'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
+                }`}
+              >
+                Inventario {type}
+              </button>
+            ))}
+          </div>
+
+          <div className="flex items-center gap-2">
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={onFileChange}
+              accept=".csv"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={onChooseFile}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+            >
+              <Upload size={14} />
+              Cargar CSV
+            </button>
+            <button
+              type="button"
+              onClick={() => onDownloadTemplate?.(inventoryType)}
+              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2"
+            >
+              <Download size={14} />
+              Plantilla
+            </button>
+          </div>
+        </div>
+
+        {inventoryStatus?.message && (
+          <div
+            className={`p-3 rounded-lg text-xs flex items-center gap-2 ${
+              inventoryStatus.type === 'success'
+                ? 'bg-green-50 text-green-700 border border-green-100'
+                : inventoryStatus.type === 'error'
+                  ? 'bg-red-50 text-red-700 border border-red-100'
+                  : 'bg-blue-50 text-blue-700 border border-blue-100'
+            }`}
+          >
+            {inventoryStatus.type === 'success' ? (
+              <CheckCircle2 size={16} />
+            ) : (
+              <AlertTriangle size={16} />
+            )}
+            <span>{inventoryStatus.message}</span>
+          </div>
+        )}
+
         <div className="relative w-72">
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={18} />
           <input

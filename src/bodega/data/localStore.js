@@ -7,6 +7,7 @@ const STORAGE_KEYS = {
 const seedMedications = [
   {
     id: 1,
+    inventory_type: '772',
     name: 'Paracetamol',
     siges_code: 'SIG-0001',
     sicop_classifier: 'SICOP-CL-01',
@@ -20,6 +21,7 @@ const seedMedications = [
   },
   {
     id: 2,
+    inventory_type: '772',
     name: 'Amoxicilina',
     siges_code: 'SIG-0002',
     sicop_classifier: 'SICOP-CL-02',
@@ -33,6 +35,7 @@ const seedMedications = [
   },
   {
     id: 3,
+    inventory_type: '772',
     name: 'Ibuprofeno',
     siges_code: 'SIG-0003',
     sicop_classifier: 'SICOP-CL-03',
@@ -46,6 +49,7 @@ const seedMedications = [
   },
   {
     id: 4,
+    inventory_type: '772',
     name: 'Omeprazol',
     siges_code: 'SIG-0004',
     sicop_classifier: 'SICOP-CL-04',
@@ -136,4 +140,3 @@ export const localStore = {
     writeJson(STORAGE_KEYS.selectedMonthlyBatchId, id)
   },
 }
-

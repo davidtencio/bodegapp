@@ -10,6 +10,7 @@ import InventoryView from './views/InventoryView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import {
   downloadCatalogTemplateCsv,
+  downloadInventoryTemplateCsv,
   downloadMonthlyConsumptionTemplateCsv,
   normalizeDateInput,
   readCsvAsJson,
@@ -24,6 +25,7 @@ export default function BodegaApp() {
 
   const [medications, setMedications] = useState([])
   const [inventorySearch, setInventorySearch] = useState('')
+  const [inventoryType, setInventoryType] = useState('772')
 
   const [showAddMedModal, setShowAddMedModal] = useState(false)
   const [editingMed, setEditingMed] = useState(null)
@@ -32,6 +34,9 @@ export default function BodegaApp() {
 
   const fileInputRef = useRef(null)
   const [excelStatus, setExcelStatus] = useState({ loading: false, message: '', type: '' })
+
+  const inventoryFileInputRef = useRef(null)
+  const [inventoryStatus, setInventoryStatus] = useState({ loading: false, message: '', type: '' })
 
   const monthlyFileInputRef = useRef(null)
   const [monthlyStatus, setMonthlyStatus] = useState({ loading: false, message: '', type: '' })
@@ -104,13 +109,15 @@ export default function BodegaApp() {
   )
 
   const filteredInventory = useMemo(() => {
+    const selectedType = String(inventoryType || '772')
+    const base = medications.filter((m) => String(m.inventory_type || '772') === selectedType)
     const query = inventorySearch.trim().toLowerCase()
-    if (!query) return medications
-    return medications.filter((m) => {
+    if (!query) return base
+    return base.filter((m) => {
       const haystack = `${m.name} ${m.category} ${m.batch} ${m.unit}`.toLowerCase()
       return haystack.includes(query)
     })
-  }, [inventorySearch, medications])
+  }, [inventorySearch, medications, inventoryType])
 
   const openNewMedication = () => {
     setEditingMed(null)
@@ -132,6 +139,7 @@ export default function BodegaApp() {
     const formData = new FormData(e.target)
     const newMed = {
       id: editingMed ? editingMed.id : globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now(),
+      inventory_type: editingMed?.inventory_type ?? String(inventoryType || '772'),
       siges_code: editingMed?.siges_code ?? '',
       sicop_classifier: editingMed?.sicop_classifier ?? '',
       sicop_identifier: editingMed?.sicop_identifier ?? '',
@@ -190,6 +198,59 @@ export default function BodegaApp() {
     }
   }
 
+  const makeMedicationKey = ({ siges_code, name }) => {
+    const code = String(siges_code || '').trim()
+    if (code) return `code:${code}`
+    const normalizedName = String(name || '').trim().toLowerCase()
+    if (normalizedName) return `name:${normalizedName}`
+    return ''
+  }
+
+  const upsertInventoryFromCsvText = async ({ text, type }) => {
+    const selectedType = String(type || '772').trim() || '772'
+    const data = readCsvAsJson(text)
+
+    const current = (await store.getMedications()) ?? []
+    const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
+    const byKeyToId = new Map(
+      existingForType
+        .map((m) => [makeMedicationKey(m), m.id])
+        .filter(([key]) => Boolean(key)),
+    )
+
+    const now = Date.now()
+    const importedMeds = data
+      .map((row, index) => {
+        const siges_code = String(row.CodigoSIGES || '').trim()
+        const name = String(row.Medicamento || row.Nombre || '').trim()
+        const key = makeMedicationKey({ siges_code, name })
+        if (!key) return null
+
+        const existingId = byKeyToId.get(key)
+        const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
+
+        return {
+          id,
+          inventory_type: selectedType,
+          siges_code,
+          sicop_classifier: String(row.ClasificadorSICOP || '').trim(),
+          sicop_identifier: String(row.IdentificadorSICOP || '').trim(),
+          name: name || 'Sin nombre',
+          category: String(row.Categoria || 'General').trim() || 'General',
+          batch: String(row.Lote || 'S/N').trim() || 'S/N',
+          expiry_date: normalizeDateInput(row.Vencimiento),
+          stock: Number.parseInt(String(row.Stock || 0), 10) || 0,
+          min_stock: Number.parseInt(String(row.StockMinimo || 10), 10) || 10,
+          unit: String(row.Unidad || 'Unidad').trim() || 'Unidad',
+        }
+      })
+      .filter(Boolean)
+
+    await store.upsertMedications(importedMeds)
+    await reloadMedications()
+    return importedMeds.length
+  }
+
   const processCsv = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
@@ -230,6 +291,43 @@ export default function BodegaApp() {
         window.setTimeout(() => setExcelStatus({ loading: false, message: '', type: '' }), 4000)
       } catch (err) {
         setExcelStatus({
+          loading: false,
+          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV.',
+          type: 'error',
+        })
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = null
+  }
+
+  const processInventoryCsv = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    const selectedType = String(inventoryType || '772')
+    setInventoryStatus({
+      loading: true,
+      message: `Procesando inventario ${selectedType}: ${file.name}`,
+      type: 'info',
+    })
+
+    const reader = new FileReader()
+    reader.onerror = () => {
+      setInventoryStatus({ loading: false, message: 'No se pudo leer el archivo.', type: 'error' })
+    }
+    reader.onload = async (evt) => {
+      try {
+        const text = String(evt.target?.result || '')
+        const count = await upsertInventoryFromCsvText({ text, type: selectedType })
+        setInventoryStatus({
+          loading: false,
+          message: `Inventario ${selectedType}: ${count} medicamentos importados/actualizados.`,
+          type: 'success',
+        })
+        window.setTimeout(() => setInventoryStatus({ loading: false, message: '', type: '' }), 4000)
+      } catch (err) {
+        setInventoryStatus({
           loading: false,
           message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV.',
           type: 'error',
@@ -386,6 +484,17 @@ export default function BodegaApp() {
 
         {activeTab === 'inventory' && (
           <InventoryView
+            inventoryType={inventoryType}
+            onInventoryTypeChange={(type) => {
+              setInventoryType(type)
+              setInventorySearch('')
+              setInventoryStatus({ loading: false, message: '', type: '' })
+            }}
+            inventoryStatus={inventoryStatus}
+            fileInputRef={inventoryFileInputRef}
+            onChooseFile={() => inventoryFileInputRef.current?.click()}
+            onFileChange={processInventoryCsv}
+            onDownloadTemplate={downloadInventoryTemplateCsv}
             search={inventorySearch}
             onSearchChange={setInventorySearch}
             items={filteredInventory}
