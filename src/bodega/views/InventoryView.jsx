@@ -129,30 +129,37 @@ export default function InventoryView({
         </div>
       </div>
 
-      <table className="w-full text-left">
+      <div className="overflow-x-auto">
+        <table className="min-w-max w-full text-left">
         <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
           <tr>
-            <th className="px-6 py-4 text-center">Código SIGES</th>
-            <th className="px-6 py-4">Medicamento</th>
-            {is771 && <th className="px-6 py-4 text-center">Lote</th>}
-            {is771 && <th className="px-6 py-4 text-center">Vencimiento</th>}
-            <th className="px-6 py-4 text-center">Inventario</th>
+            <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
+            <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
+            {is771 && <th className="px-6 py-4 text-center whitespace-nowrap">Lote</th>}
+            {is771 && <th className="px-6 py-4 text-center whitespace-nowrap">Vencimiento</th>}
+            <th className="px-6 py-4 text-center whitespace-nowrap">Inventario</th>
           </tr>
         </thead>
         <tbody className="divide-y divide-slate-100">
           {items.map((item) => (
             <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-              <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center">{item.siges_code || ''}</td>
-              <td className="px-6 py-4">
-                <span className="font-medium text-slate-700">{item.name}</span>
+              <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center whitespace-nowrap">
+                {item.siges_code || ''}
+              </td>
+              <td className="px-6 py-4 max-w-[620px]">
+                <span className="block truncate font-medium text-slate-700">{item.name}</span>
               </td>
               {is771 && (
-                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center">{item.batch || ''}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center whitespace-nowrap">
+                  {item.batch || ''}
+                </td>
               )}
               {is771 && (
-                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center">{item.expiry_date || ''}</td>
+                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center whitespace-nowrap">
+                  {item.expiry_date || ''}
+                </td>
               )}
-              <td className="px-6 py-4 text-center">
+              <td className="px-6 py-4 text-center whitespace-nowrap">
                 <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
               </td>
             </tr>
@@ -165,7 +172,8 @@ export default function InventoryView({
             </tr>
           )}
         </tbody>
-      </table>
+        </table>
+      </div>
 
       <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
         <div className="text-xs text-slate-500">{total === 0 ? '0 resultados' : `Mostrando ${start}-${end} de ${total}`}</div>
@@ -208,4 +216,3 @@ export default function InventoryView({
     </div>
   )
 }
-
