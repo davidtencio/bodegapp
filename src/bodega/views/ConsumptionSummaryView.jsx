@@ -190,16 +190,16 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map((r, idx) => (
                     <tr key={`${r.siges_code || r.medication_name}-${idx}`} className="hover:bg-slate-50">
-                      <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap">{r.siges_code || ''}</td>
+                      <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap text-center">{r.siges_code || ''}</td>
                       <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">
                         {r.medication_name}
                       </td>
-                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[2] ?? 0)}</td>
-                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[1] ?? 0)}</td>
-                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[0] ?? 0)}</td>
-                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.avg)}</td>
-                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.sd)}</td>
-                      <td className="px-3 py-4 text-right font-mono text-sm font-bold text-blue-700 tabular-nums">{formatNumber(r.total)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[2] ?? 0)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[1] ?? 0)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[0] ?? 0)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.avg)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.sd)}</td>
+                      <td className="px-3 py-4 text-center font-mono text-sm font-bold text-blue-700 tabular-nums">{formatNumber(r.total)}</td>
                     </tr>
                   ))}
                   {paginated.length === 0 && (
