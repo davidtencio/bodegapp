@@ -14,9 +14,26 @@ function ensureId(medication) {
 export const supabaseStore = {
   async getMedications() {
     const client = getRequiredSupabase()
-    const { data, error } = await client.from('medications').select('*').order('created_at', { ascending: true })
-    if (error) throw error
-    return data ?? []
+
+    const pageSize = 1000
+    let from = 0
+    const all = []
+
+    while (true) {
+      const { data, error } = await client
+        .from('medications')
+        .select('*')
+        .order('created_at', { ascending: true })
+        .range(from, from + pageSize - 1)
+
+      if (error) throw error
+      const chunk = data ?? []
+      all.push(...chunk)
+      if (chunk.length < pageSize) break
+      from += pageSize
+    }
+
+    return all
   },
 
   async clearMedicationsByInventoryType(inventoryType) {
