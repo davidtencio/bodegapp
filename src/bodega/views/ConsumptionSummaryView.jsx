@@ -1,4 +1,4 @@
-import React from 'react'
+import React, { useMemo, useState } from 'react'
 
 import { BarChart3, RefreshCcw } from 'lucide-react'
 
@@ -31,15 +31,32 @@ function buildMedicationKey({ siges_code, medication_name }) {
   return name ? `name:${name}` : ''
 }
 
+function StatusBanner({ status }) {
+  if (!status?.message) return null
+
+  const styles =
+    status.type === 'success'
+      ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
+      : status.type === 'error'
+        ? 'bg-rose-50 border-rose-200 text-rose-800'
+        : 'bg-blue-50 border-blue-200 text-blue-800'
+
+  return (
+    <div className={`border rounded-lg px-4 py-3 text-sm ${styles}`}>
+      <span>{status.message}</span>
+    </div>
+  )
+}
+
 export default function ConsumptionSummaryView({ months, onRefresh, status }) {
-  const lastThree = (months ?? []).slice(0, 3)
+  const lastThree = (months ?? []).slice(0, 3) // newest -> older (según fecha de carga)
   const monthLabels = lastThree.map((m) => String(m?.label ?? '').trim()).filter(Boolean)
 
-  const [search, setSearch] = React.useState('')
-  const [pageSize, setPageSize] = React.useState(50)
-  const [page, setPage] = React.useState(1)
+  const [search, setSearch] = useState('')
+  const [pageSize, setPageSize] = useState(50)
+  const [page, setPage] = useState(1)
 
-  const rows = React.useMemo(() => {
+  const rows = useMemo(() => {
     const map = new Map()
 
     lastThree.forEach((m, monthIndex) => {
@@ -76,7 +93,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
     })
   }, [lastThree])
 
-  const filtered = React.useMemo(() => {
+  const filtered = useMemo(() => {
     const q = search.trim().toLowerCase()
     const base = q
       ? rows.filter((r) => {
@@ -93,15 +110,10 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
   const totalPages = Math.max(1, Math.ceil(totalItems / safePageSize))
   const safePage = Math.min(Math.max(page, 1), totalPages)
 
-  const paginated = React.useMemo(() => {
+  const paginated = useMemo(() => {
     const startIndex = (safePage - 1) * safePageSize
     return filtered.slice(startIndex, startIndex + safePageSize)
   }, [filtered, safePage, safePageSize])
-
-  React.useEffect(() => {
-    if (page !== safePage) setPage(safePage)
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [safePage])
 
   const start = totalItems === 0 ? 0 : (safePage - 1) * safePageSize + 1
   const end = Math.min(safePage * safePageSize, totalItems)
@@ -113,7 +125,8 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
           <div className="space-y-1">
             <h3 className="font-semibold text-slate-800">Resumen de consumo</h3>
             <p className="text-xs text-slate-500">
-              Métricas por medicamento usando los 3 meses más recientes (según fecha de carga).
+              Muestra por medicamento: código, consumos de los últimos 3 meses, promedio, desviación estándar y total
+              (promedio + desviación).
             </p>
           </div>
 
@@ -129,19 +142,9 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
           </div>
         </div>
 
-        {status?.message && (
-          <div
-            className={`mt-4 border rounded-lg px-4 py-3 text-sm ${
-              status.type === 'success'
-                ? 'bg-emerald-50 border-emerald-200 text-emerald-800'
-                : status.type === 'error'
-                  ? 'bg-rose-50 border-rose-200 text-rose-800'
-                  : 'bg-blue-50 border-blue-200 text-blue-800'
-            }`}
-          >
-            <span>{status.message}</span>
-          </div>
-        )}
+        <div className="mt-4">
+          <StatusBanner status={status} />
+        </div>
       </div>
 
       <div className="bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
@@ -150,7 +153,7 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
             <div className="bg-blue-50 text-blue-600 p-2 rounded-lg">
               <BarChart3 size={18} />
             </div>
-            <h3 className="font-bold text-slate-800">Consumo por medicamento (3 meses)</h3>
+            <h3 className="font-bold text-slate-800">Consumo por medicamento (últimos 3 meses)</h3>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
@@ -171,30 +174,32 @@ export default function ConsumptionSummaryView({ months, onRefresh, status }) {
         ) : (
           <>
             <div className="overflow-x-auto">
-              <table className="w-full text-left">
+              <table className="w-full min-w-[1100px] text-left">
                 <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
                   <tr>
-                    <th className="px-6 py-4 whitespace-nowrap">Código SIGES</th>
-                    <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">{monthLabels[2] ?? 'Mes 3'}</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">{monthLabels[1] ?? 'Mes 2'}</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">{monthLabels[0] ?? 'Mes 1'}</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">Promedio</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">Desv. Est.</th>
-                    <th className="px-6 py-4 text-right whitespace-nowrap">Total (Prom.+Desv.)</th>
+                    <th className="px-4 py-4 whitespace-nowrap w-36">Código SIGES</th>
+                    <th className="px-4 py-4 whitespace-nowrap">Medicamento</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[2] ?? 'Mes 3'}</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[1] ?? 'Mes 2'}</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-32">{monthLabels[0] ?? 'Mes 1'}</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-28">Promedio</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-28">Desv. Est.</th>
+                    <th className="px-3 py-4 text-right whitespace-nowrap w-36">Total (Prom.+Desv.)</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-slate-100">
                   {paginated.map((r, idx) => (
                     <tr key={`${r.siges_code || r.medication_name}-${idx}`} className="hover:bg-slate-50">
-                      <td className="px-6 py-4 text-xs text-slate-600 font-mono whitespace-nowrap">{r.siges_code || ''}</td>
-                      <td className="px-6 py-4 text-sm font-medium text-slate-700 whitespace-nowrap">{r.medication_name}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[2] ?? 0)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[1] ?? 0)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[0] ?? 0)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.avg)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.sd)}</td>
-                      <td className="px-6 py-4 text-right font-mono text-sm font-bold text-blue-700 tabular-nums">{formatNumber(r.total)}</td>
+                      <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap">{r.siges_code || ''}</td>
+                      <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">
+                        {r.medication_name}
+                      </td>
+                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[2] ?? 0)}</td>
+                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[1] ?? 0)}</td>
+                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.perMonth[0] ?? 0)}</td>
+                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.avg)}</td>
+                      <td className="px-3 py-4 text-right font-mono text-sm tabular-nums">{formatNumber(r.sd)}</td>
+                      <td className="px-3 py-4 text-right font-mono text-sm font-bold text-blue-700 tabular-nums">{formatNumber(r.total)}</td>
                     </tr>
                   ))}
                   {paginated.length === 0 && (
