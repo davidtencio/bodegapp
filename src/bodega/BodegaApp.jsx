@@ -780,7 +780,16 @@ export default function BodegaApp() {
           />
         )}
 
-        {activeTab === 'order-request' && <OrderRequestView />}
+        {activeTab === 'order-request' && (
+          <OrderRequestView
+            medications={medications}
+            months={monthlyBatches}
+            inventoryStatus={inventoryStatus}
+            monthlyStatus={monthlyStatus}
+            onRefreshInventories={refreshInventories}
+            onRefreshConsumptions={refreshMonthlyBatches}
+          />
+        )}
 
         {activeTab === 'alerts' && (
           <AlertsView lowStockItems={lowStockItems} onEditMedication={openEditMedication} />
