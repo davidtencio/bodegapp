@@ -6,6 +6,14 @@ export default function StatCard({ title, value, icon: Icon, color }) {
     purple: 'bg-purple-50 text-purple-600 border-purple-100',
   }
 
+  const formattedValue =
+    typeof value === 'number'
+      ? new Intl.NumberFormat('en-US', {
+          minimumFractionDigits: 0,
+          maximumFractionDigits: title === 'Total Unidades' ? 2 : 0,
+        }).format(value)
+      : value
+
   return (
     <div className="p-6 rounded-2xl border bg-white shadow-sm flex items-center space-x-4">
       <div className={`p-4 rounded-xl ${colors[color] || colors.blue}`}>
@@ -13,9 +21,8 @@ export default function StatCard({ title, value, icon: Icon, color }) {
       </div>
       <div>
         <p className="text-sm font-medium text-slate-500">{title}</p>
-        <p className="text-2xl font-bold text-slate-800">{value}</p>
+        <p className="text-2xl font-bold text-slate-800">{formattedValue}</p>
       </div>
     </div>
   )
 }
-
