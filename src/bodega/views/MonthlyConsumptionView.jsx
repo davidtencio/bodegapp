@@ -88,7 +88,7 @@ export default function MonthlyConsumptionView({
           <select
             className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
             value={selectedMonthId ?? ''}
-            onChange={(e) => onSelectMonth(e.target.value ? Number(e.target.value) : null)}
+            onChange={(e) => onSelectMonth(e.target.value || null)}
           >
             <option value="">Seleccione un mes...</option>
             {months.map((m) => (

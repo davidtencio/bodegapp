@@ -129,19 +129,22 @@ export const localStore = {
   },
 
   async getMonthlyBatches() {
-    return readArray(STORAGE_KEYS.monthlyBatches) ?? []
+    const batches = readArray(STORAGE_KEYS.monthlyBatches) ?? []
+    return batches.map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
   },
 
   async saveMonthlyBatch(batch) {
     const current = (await this.getMonthlyBatches()) ?? []
-    const next = [batch, ...current.filter((b) => b.id !== batch.id)]
+    const normalized = { ...batch, id: batch?.id != null ? String(batch.id) : batch.id }
+    const next = [normalized, ...current.filter((b) => String(b.id) !== String(normalized.id))]
     writeJson(STORAGE_KEYS.monthlyBatches, next)
-    return batch
+    return normalized
   },
 
   async getSelectedMonthlyBatchId() {
     const raw = window.localStorage.getItem(STORAGE_KEYS.selectedMonthlyBatchId)
-    return raw ? safeJsonParse(raw) ?? raw : null
+    const parsed = raw ? safeJsonParse(raw) ?? raw : null
+    return parsed == null ? null : String(parsed)
   },
 
   async setSelectedMonthlyBatchId(id) {

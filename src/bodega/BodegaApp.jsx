@@ -65,9 +65,14 @@ export default function BodegaApp() {
 
         if (cancelled) return
         setMedications(loadedMedications ?? [])
-        setMonthlyBatches(loadedMonthlyBatches ?? [])
+        const normalizedBatches = (loadedMonthlyBatches ?? []).map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
+        setMonthlyBatches(normalizedBatches)
 
-        const nextSelectedId = storedSelectedId ?? loadedMonthlyBatches?.[0]?.id ?? null
+        const normalizedStoredId = storedSelectedId != null ? String(storedSelectedId) : null
+        const firstId = normalizedBatches?.[0]?.id ?? null
+        const hasStored = normalizedStoredId && normalizedBatches.some((b) => b.id === normalizedStoredId)
+
+        const nextSelectedId = hasStored ? normalizedStoredId : firstId
         setSelectedMonthlyBatchId(nextSelectedId)
         await store.setSelectedMonthlyBatchId?.(nextSelectedId)
 
@@ -89,8 +94,9 @@ export default function BodegaApp() {
   }, [])
 
   const selectMonthlyBatch = (id) => {
-    setSelectedMonthlyBatchId(id)
-    store.setSelectedMonthlyBatchId?.(id)
+    const nextId = id == null ? null : String(id)
+    setSelectedMonthlyBatchId(nextId)
+    store.setSelectedMonthlyBatchId?.(nextId)
   }
 
   const lowStockItems = useMemo(
@@ -527,7 +533,7 @@ export default function BodegaApp() {
           .filter(Boolean)
 
         const saved = await store.saveMonthlyBatch({
-          id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now(),
+          id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()),
           label: monthLabel,
           items: importedItems,
         })
