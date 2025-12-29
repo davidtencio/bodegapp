@@ -1,5 +1,6 @@
 import {
   AlertTriangle,
+  BarChart3,
   FileSpreadsheet,
   LayoutDashboard,
   Menu,
@@ -73,6 +74,14 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           id="consumption-monthly"
           icon={Upload}
           label="Consumo mensual"
+          activeTab={activeTab}
+          isSidebarOpen={isSidebarOpen}
+          onSelect={onSelectTab}
+        />
+        <SidebarItem
+          id="consumption-summary"
+          icon={BarChart3}
+          label="Resumen consumo"
           activeTab={activeTab}
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}

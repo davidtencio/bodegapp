@@ -5,6 +5,7 @@ import PageHeader from './components/PageHeader.jsx'
 import Sidebar from './components/Sidebar.jsx'
 import AlertsView from './views/AlertsView.jsx'
 import CatalogView from './views/CatalogView.jsx'
+import ConsumptionSummaryView from './views/ConsumptionSummaryView.jsx'
 import DashboardView from './views/DashboardView.jsx'
 import InventoryView from './views/InventoryView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
@@ -767,6 +768,14 @@ export default function BodegaApp() {
             onFileChange={processMonthlyConsumptionCsv}
             onDownloadTemplate={downloadMonthlyConsumptionTemplateCsv}
             onRefresh={refreshMonthlyBatches}
+          />
+        )}
+
+        {activeTab === 'consumption-summary' && (
+          <ConsumptionSummaryView
+            months={monthlyBatches}
+            onRefresh={refreshMonthlyBatches}
+            status={monthlyStatus}
           />
         )}
 

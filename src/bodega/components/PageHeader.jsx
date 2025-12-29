@@ -9,8 +9,10 @@ export default function PageHeader({ activeTab, onNewMedication }) {
         : activeTab === 'catalog'
           ? 'Catálogo de Productos'
           : activeTab === 'consumption-monthly'
-            ? 'Consumo Mensual (CSV)'
-            : 'Alertas de Stock'
+            ? 'Consumo Mensual'
+            : activeTab === 'consumption-summary'
+              ? 'Resumen de Consumo'
+              : 'Alertas de Stock'
 
   return (
     <header className="flex justify-between items-center mb-8">
