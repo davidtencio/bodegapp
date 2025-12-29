@@ -382,9 +382,14 @@ export default function BodegaApp() {
         })
         window.setTimeout(() => setExcelStatus({ loading: false, message: '', type: '' }), 4000)
       } catch (err) {
+        const rawMessage = err?.message ? String(err.message) : ''
+        const isIntegerMismatch = rawMessage.includes('invalid input syntax for type integer')
+        const extraHint = isIntegerMismatch
+          ? 'Tu base de datos en Supabase tiene `stock`/`min_stock` como INTEGER. Ejecuta `supabase/schema.sql` (ALTER COLUMN a NUMERIC) o usa valores enteros.'
+          : ''
         setExcelStatus({
           loading: false,
-          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV.',
+          message: extraHint ? `${rawMessage}. ${extraHint}` : rawMessage || 'Error al procesar/guardar el CSV.',
           type: 'error',
         })
       }
@@ -419,9 +424,14 @@ export default function BodegaApp() {
         })
         window.setTimeout(() => setInventoryStatus({ loading: false, message: '', type: '' }), 4000)
       } catch (err) {
+        const rawMessage = err?.message ? String(err.message) : ''
+        const isIntegerMismatch = rawMessage.includes('invalid input syntax for type integer')
+        const extraHint = isIntegerMismatch
+          ? 'Tu base de datos en Supabase tiene `stock`/`min_stock` como INTEGER. Ejecuta `supabase/schema.sql` (ALTER COLUMN a NUMERIC) y vuelve a intentar.'
+          : ''
         setInventoryStatus({
           loading: false,
-          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV.',
+          message: extraHint ? `${rawMessage}. ${extraHint}` : rawMessage || 'Error al procesar/guardar el CSV.',
           type: 'error',
         })
       }
