@@ -628,8 +628,6 @@ export default function BodegaApp() {
             search={inventorySearch}
             onSearchChange={setInventorySearch}
             items={filteredInventory}
-            onEditMedication={openEditMedication}
-            onDeleteMedication={deleteMedication}
           />
         )}
 
