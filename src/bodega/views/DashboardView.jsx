@@ -33,11 +33,11 @@ export default function DashboardView({
         const days = item?._daysToReceipt != null ? String(item._daysToReceipt) : ''
         return `
           <tr>
-            <td>${escapeHtml(item?.siges_code || '')}</td>
+            <td class="center mono">${escapeHtml(item?.siges_code || '')}</td>
             <td>${escapeHtml(item?.name || '')}</td>
-            <td class="num">${escapeHtml(min)}</td>
-            <td class="num">${escapeHtml(stock)}</td>
-            <td class="num">${escapeHtml(days)}</td>
+            <td class="center mono">${escapeHtml(min)}</td>
+            <td class="center mono">${escapeHtml(stock)}</td>
+            <td class="center mono">${escapeHtml(days)}</td>
           </tr>
         `
       })
@@ -57,7 +57,8 @@ export default function DashboardView({
             table { width: 100%; border-collapse: collapse; }
             th, td { border: 1px solid #e2e8f0; padding: 8px; font-size: 12px; vertical-align: top; }
             th { background: #f8fafc; text-align: left; }
-            td.num { text-align: right; white-space: nowrap; }
+            .center { text-align: center; white-space: nowrap; }
+            .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
             @page { size: A4 landscape; margin: 10mm; }
           </style>
         </head>
@@ -67,11 +68,11 @@ export default function DashboardView({
           <table>
             <thead>
               <tr>
-                <th>Código SIGES</th>
+                <th class="center">Código SIGES</th>
                 <th>Medicamento</th>
-                <th>Mínimo</th>
-                <th>Actual</th>
-                <th>Días a recepción</th>
+                <th class="center">Mínimo</th>
+                <th class="center">Actual</th>
+                <th class="center">Días a recepción</th>
               </tr>
             </thead>
             <tbody>
