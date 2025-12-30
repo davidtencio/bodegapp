@@ -31,7 +31,7 @@ export default function CalendarView({ status, entries, onRefresh, onSave }) {
   const [dirty, setDirty] = useState(false)
 
   const years = useMemo(() => {
-    const set = new Set([currentYear])
+    const set = new Set([currentYear, currentYear + 1])
     for (const entry of entries ?? []) {
       const y = Number(entry?.year)
       if (Number.isFinite(y) && y > 0) set.add(y)
@@ -145,7 +145,7 @@ export default function CalendarView({ status, entries, onRefresh, onSave }) {
           <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
             <tr>
               <th className="px-6 py-4 whitespace-nowrap">Mes</th>
-              <th className="px-6 py-4 whitespace-nowrap">Recepci贸n programada</th>
+              <th className="px-6 py-4 whitespace-nowrap">Recepción programada</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -176,4 +176,3 @@ export default function CalendarView({ status, entries, onRefresh, onSave }) {
     </div>
   )
 }
-
