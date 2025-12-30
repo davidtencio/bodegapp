@@ -28,10 +28,28 @@ export default function InventoryView({
     return String(value ?? '0')
   }
 
+  const formatDateEs = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return 'S/N'
+
+    const ymd = raw.match(/^(\d{4})-(\d{2})-(\d{2})/)
+    if (ymd) return `${ymd[3]}/${ymd[2]}/${ymd[1]}`
+
+    const parsed = new Date(raw)
+    if (!Number.isNaN(parsed.getTime())) {
+      const dd = String(parsed.getDate()).padStart(2, '0')
+      const mm = String(parsed.getMonth() + 1).padStart(2, '0')
+      const yyyy = String(parsed.getFullYear())
+      return `${dd}/${mm}/${yyyy}`
+    }
+
+    return raw
+  }
+
   const formatLotLine = (lot) => {
     if (!lot) return ''
     const batch = String(lot.batch || '').trim() || 'S/N'
-    const expiry = String(lot.expiry_date || '').trim() || 'S/N'
+    const expiry = formatDateEs(lot.expiry_date)
     const qty = formatInventoryValue(lot.stock)
     return `${batch} (${expiry}): ${qty}`
   }
@@ -149,15 +167,15 @@ export default function InventoryView({
           </thead>
           <tbody className="divide-y divide-slate-100">
             {items.map((item) => (
-              <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-                <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center whitespace-nowrap">
+              <tr key={item.id} className="hover:bg-slate-50 transition-colors group text-sm">
+                <td className="px-6 py-4 text-slate-700 font-mono text-center whitespace-nowrap">
                   {item.siges_code || ''}
                 </td>
-                <td className="px-6 py-4 max-w-[620px]">
-                  <span className="block truncate font-medium text-slate-700">{item.name}</span>
+                <td className="px-6 py-4 max-w-[620px] text-slate-700">
+                  <span className="block truncate font-medium">{item.name}</span>
                 </td>
                 {is771 && (
-                  <td className="px-6 py-4 text-sm text-slate-600 font-mono">
+                  <td className="px-6 py-4 text-slate-600 font-mono">
                     <div className="flex flex-col gap-1">
                       {Array.isArray(item.lots) && item.lots.length > 0 ? (
                         item.lots.map((lot) => (
@@ -171,8 +189,8 @@ export default function InventoryView({
                     </div>
                   </td>
                 )}
-                <td className="px-6 py-4 text-center whitespace-nowrap">
-                  <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
+                <td className="px-6 py-4 text-center whitespace-nowrap text-slate-800">
+                  <span className="font-bold">{formatInventoryValue(item.stock)}</span>
                 </td>
               </tr>
             ))}
