@@ -1831,6 +1831,7 @@ export default function BodegaApp() {
             stats={stats}
             consumptions={monthlyBatches[0]?.items || []}
             lowStockItems={lowStockItems}
+            medicationCategories={medicationCategories}
             onViewAllConsumptions={() => setActiveTab('consumption-monthly')}
             onEditMedication={openEditMedication}
           />

@@ -1,10 +1,12 @@
 import { AlertTriangle, ChevronRight, ClipboardList, Download, Package, Pill, TrendingDown } from 'lucide-react'
 import StatCard from '../components/StatCard.jsx'
+import { useMemo, useState } from 'react'
 
 export default function DashboardView({
   stats,
   consumptions,
   lowStockItems,
+  medicationCategories,
   onViewAllConsumptions,
   onEditMedication,
 }) {
@@ -22,11 +24,69 @@ export default function DashboardView({
       .replace(/"/g, '&quot;')
       .replace(/'/g, '&#039;')
 
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set()
+    for (const row of medicationCategories ?? []) {
+      const cat = String(row?.category ?? '').trim()
+      if (cat) set.add(cat)
+    }
+    return ['Todas', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'es')), 'Sin categoría']
+  }, [medicationCategories])
+
+  const categoryByCode = useMemo(() => {
+    const map = new Map()
+    for (const row of medicationCategories ?? []) {
+      const code = String(row?.siges_code ?? '').trim()
+      const cat = String(row?.category ?? '').trim()
+      if (!code) continue
+      map.set(code, cat)
+    }
+    return map
+  }, [medicationCategories])
+
+  const sortedFilteredLowStockItems = useMemo(() => {
+    const normalizeDigits = (code) => String(code ?? '').replace(/\D/g, '')
+    const last4Num = (digits) => {
+      if (!digits) return Number.POSITIVE_INFINITY
+      const last = digits.slice(-4)
+      const n = Number.parseInt(last, 10)
+      return Number.isFinite(n) ? n : Number.POSITIVE_INFINITY
+    }
+
+    const matchesCategory = (item) => {
+      if (!categoryFilter || categoryFilter === 'Todas') return true
+      const code = String(item?.siges_code ?? '').trim()
+      const cat = categoryByCode.get(code) || ''
+      if (categoryFilter === 'Sin categoría') return !cat
+      return cat === categoryFilter
+    }
+
+    const next = (lowStockItems ?? []).filter(matchesCategory)
+
+    next.sort((a, b) => {
+      const aDigits = normalizeDigits(a?.siges_code)
+      const bDigits = normalizeDigits(b?.siges_code)
+      const aIs110 = aDigits.startsWith('110')
+      const bIs110 = bDigits.startsWith('110')
+      if (aIs110 !== bIs110) return aIs110 ? -1 : 1
+      const aLast = last4Num(aDigits)
+      const bLast = last4Num(bDigits)
+      if (aLast !== bLast) return aLast - bLast
+      const aKey = aDigits || String(a?.siges_code ?? '')
+      const bKey = bDigits || String(b?.siges_code ?? '')
+      return aKey.localeCompare(bKey)
+    })
+
+    return next
+  }, [categoryByCode, categoryFilter, lowStockItems])
+
   const exportLowStockToPdf = () => {
     const printedAt = new Date().toLocaleString()
     const title = 'Medicamentos Agotándose'
 
-    const rowsHtml = (lowStockItems ?? [])
+    const rowsHtml = (sortedFilteredLowStockItems ?? [])
       .map((item) => {
         const min = formatNumber(item?.computed_min_stock ?? item?.min_stock)
         const stock = formatNumber(item?.stock)
@@ -64,7 +124,7 @@ export default function DashboardView({
         </head>
         <body>
           <h1>${escapeHtml(title)}</h1>
-          <div class="meta">Generado: ${escapeHtml(printedAt)} · Filas: ${escapeHtml((lowStockItems ?? []).length)}</div>
+          <div class="meta">Generado: ${escapeHtml(printedAt)} · Categoría: ${escapeHtml(categoryFilter)} · Filas: ${escapeHtml((sortedFilteredLowStockItems ?? []).length)}</div>
           <table>
             <thead>
               <tr>
@@ -150,6 +210,18 @@ export default function DashboardView({
           <div className="flex justify-between items-center mb-4">
             <h3 className="font-bold text-slate-800">Medicamentos Agotándose</h3>
             <div className="flex items-center gap-2">
+              <select
+                value={categoryFilter}
+                onChange={(e) => setCategoryFilter(e.target.value)}
+                className="px-3 py-2 rounded-lg bg-white border border-slate-200 text-slate-700 text-xs font-bold hover:bg-slate-50"
+                title="Filtrar por categoría"
+              >
+                {categoryOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={exportLowStockToPdf}
@@ -160,13 +232,13 @@ export default function DashboardView({
                 Exportar PDF
               </button>
               <span className="bg-red-100 text-red-700 text-xs px-2 py-1 rounded-full font-bold">
-                {lowStockItems.length} Alertas
+                {sortedFilteredLowStockItems.length} Alertas
               </span>
             </div>
           </div>
           <div className="space-y-4">
-            {lowStockItems.length > 0 ? (
-              lowStockItems.map((item) => (
+            {sortedFilteredLowStockItems.length > 0 ? (
+              sortedFilteredLowStockItems.map((item) => (
                 <div
                   key={item.id}
                   className="flex items-center justify-between p-3 border-l-4 border-red-500 bg-red-50 rounded-r-lg"
