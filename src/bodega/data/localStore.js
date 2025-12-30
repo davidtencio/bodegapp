@@ -198,4 +198,10 @@ export const localStore = {
   async clearMedicationCategories() {
     writeJson(STORAGE_KEYS.medicationCategories, [])
   },
+
+  async deleteMedicationCategory(id) {
+    const current = (await this.getMedicationCategories()) ?? []
+    const next = current.filter((item) => String(item.id) !== String(id))
+    writeJson(STORAGE_KEYS.medicationCategories, next)
+  },
 }

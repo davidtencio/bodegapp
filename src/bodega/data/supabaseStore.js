@@ -192,4 +192,10 @@ export const supabaseStore = {
       .neq('id', '00000000-0000-0000-0000-000000000000')
     if (error) throw error
   },
+
+  async deleteMedicationCategory(id) {
+    const client = getRequiredSupabase()
+    const { error } = await client.from('medication_categories').delete().eq('id', id)
+    if (error) throw error
+  },
 }

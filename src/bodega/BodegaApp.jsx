@@ -440,6 +440,54 @@ export default function BodegaApp() {
     }
   }
 
+  const upsertMedicationCategory = async (item) => {
+    try {
+      setCategoriesStatus({ loading: true, message: 'Guardando...', type: 'info' })
+      await store.upsertMedicationCategories?.([item])
+      const next = (await store.getMedicationCategories?.()) ?? []
+      setMedicationCategories(next)
+      setCategoriesStatus({ loading: false, message: 'Categoría actualizada.', type: 'success' })
+      window.setTimeout(() => setCategoriesStatus({ loading: false, message: '', type: '' }), 2500)
+    } catch (err) {
+      const hint = getCategoriesSupabaseHint(err)
+      setCategoriesStatus({
+        loading: false,
+        message: hint
+          ? `${String(err?.message || 'No se pudo guardar.')}. ${hint}`
+          : err?.message
+            ? String(err.message)
+            : 'No se pudo guardar.',
+        type: 'error',
+      })
+    }
+  }
+
+  const deleteMedicationCategory = async (item) => {
+    if (!item?.id) return
+    const ok = window.confirm('¿Desea eliminar esta categoría?')
+    if (!ok) return
+
+    try {
+      setCategoriesStatus({ loading: true, message: 'Eliminando...', type: 'info' })
+      await store.deleteMedicationCategory?.(item.id)
+      const next = (await store.getMedicationCategories?.()) ?? []
+      setMedicationCategories(next)
+      setCategoriesStatus({ loading: false, message: 'Categoría eliminada.', type: 'success' })
+      window.setTimeout(() => setCategoriesStatus({ loading: false, message: '', type: '' }), 2500)
+    } catch (err) {
+      const hint = getCategoriesSupabaseHint(err)
+      setCategoriesStatus({
+        loading: false,
+        message: hint
+          ? `${String(err?.message || 'No se pudo eliminar.')}. ${hint}`
+          : err?.message
+            ? String(err.message)
+            : 'No se pudo eliminar.',
+        type: 'error',
+      })
+    }
+  }
+
   const downloadTertiaryTemplateXlsx = () => {
     const rows = [
       ['CODIGO', 'MEDICAMENTO', 'EMPAQUE TERCIARIO'],
@@ -1706,6 +1754,8 @@ export default function BodegaApp() {
             onRefresh={refreshMedicationCategories}
             canClear={(medicationCategories ?? []).length > 0}
             onClear={clearMedicationCategories}
+            onEdit={upsertMedicationCategory}
+            onDelete={deleteMedicationCategory}
             search={categoriesSearch}
             onSearchChange={(value) => {
               setCategoriesSearch(value)
