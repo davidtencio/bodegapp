@@ -83,11 +83,24 @@ export default function DashboardView({
       </html>
     `
 
-    const printWindow = window.open('', '_blank', 'noopener,noreferrer')
-    if (!printWindow) return
-    printWindow.document.open()
-    printWindow.document.write(html)
-    printWindow.document.close()
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } finally {
+        window.setTimeout(() => iframe.remove(), 1000)
+      }
+    }
+    iframe.srcdoc = html
+    document.body.appendChild(iframe)
   }
 
   return (
