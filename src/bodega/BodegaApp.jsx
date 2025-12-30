@@ -389,8 +389,8 @@ export default function BodegaApp() {
 
   const downloadTertiaryTemplateXlsx = () => {
     const rows = [
-      ['Codigo SIGES', 'Medicamento', 'Cantidad (empaque terciario)'],
-      ['110-16-0010', 'ACETAMINOFEN 500 MG., TABLETAS', 12],
+      ['CODIGO', 'MEDICAMENTO', 'EMPAQUE TERCIARIO'],
+      ['110-16-0010', 'PARACETAMOL 500 MG., TABLETAS', 200.0],
     ]
     const ws = XLSX.utils.aoa_to_sheet(rows)
     const wb = XLSX.utils.book_new()

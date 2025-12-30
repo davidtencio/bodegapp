@@ -108,7 +108,7 @@ export default function TertiaryPackagingView({
             <tr>
               <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
               <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
-              <th className="px-6 py-4 text-center whitespace-nowrap">Cantidad (empaque)</th>
+              <th className="px-6 py-4 text-center whitespace-nowrap">Empaque terciario</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -173,4 +173,3 @@ export default function TertiaryPackagingView({
     </div>
   )
 }
-
