@@ -69,7 +69,7 @@ export default function OrderRequestView({
   onRefreshInventories,
   onRefreshConsumptions,
 }) {
-  const [monthsToRequest, setMonthsToRequest] = useState(3)
+  const [monthsToRequest, setMonthsToRequest] = useState(2)
   const [search, setSearch] = useState('')
   const [hideZeroOrder, setHideZeroOrder] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState('Todas')
