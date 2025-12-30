@@ -58,6 +58,17 @@ export default function BodegaApp() {
   const [tertiaryPage, setTertiaryPage] = useState(1)
   const [tertiaryPageSize, setTertiaryPageSize] = useState(50)
 
+  const getTertiarySupabaseHint = (err) => {
+    const raw = err?.message ? String(err.message) : ''
+    const isSchemaCache = raw.toLowerCase().includes('schema cache') || raw.toLowerCase().includes('could not find the table')
+    if (!isSchemaCache) return ''
+
+    return (
+      'Parece que en Supabase aún no existe (o no se ha refrescado) la tabla `public.tertiary_packaging`. ' +
+      'Ejecuta `supabase/schema.sql` en Supabase (SQL Editor) y luego recarga el schema con: NOTIFY pgrst, \'reload schema\';'
+    )
+  }
+
   useEffect(() => {
     let cancelled = false
 
@@ -72,10 +83,9 @@ export default function BodegaApp() {
       })
 
       try {
-        const [loadedMedications, loadedMonthlyBatches, loadedTertiary, storedSelectedId] = await Promise.all([
+        const [loadedMedications, loadedMonthlyBatches, storedSelectedId] = await Promise.all([
           store.getMedications(),
           store.getMonthlyBatches(),
-          store.getTertiaryPackaging?.() ?? [],
           store.getSelectedMonthlyBatchId?.(),
         ])
 
@@ -83,7 +93,21 @@ export default function BodegaApp() {
         setMedications(loadedMedications ?? [])
         const normalizedBatches = (loadedMonthlyBatches ?? []).map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
         setMonthlyBatches(normalizedBatches)
-        setTertiaryPackaging(loadedTertiary ?? [])
+
+        try {
+          const loadedTertiary = (await store.getTertiaryPackaging?.()) ?? []
+          if (!cancelled) setTertiaryPackaging(loadedTertiary ?? [])
+        } catch (err) {
+          const hint = getTertiarySupabaseHint(err)
+          if (!cancelled) {
+            setTertiaryPackaging([])
+            setTertiaryStatus({
+              loading: false,
+              message: hint ? `${String(err?.message || err || 'Error al cargar Empaque Terciario.')}. ${hint}` : String(err?.message || err || 'Error al cargar Empaque Terciario.'),
+              type: 'error',
+            })
+          }
+        }
 
         const normalizedStoredId = storedSelectedId != null ? String(storedSelectedId) : null
         const firstId = normalizedBatches?.[0]?.id ?? null
@@ -354,9 +378,10 @@ export default function BodegaApp() {
       setTertiaryStatus({ loading: false, message: `Sincronizado: ${next.length} registros.`, type: 'success' })
       window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
     } catch (err) {
+      const hint = getTertiarySupabaseHint(err)
       setTertiaryStatus({
         loading: false,
-        message: err?.message ? String(err.message) : 'No se pudo sincronizar.',
+        message: hint ? `${String(err?.message || 'No se pudo sincronizar.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo sincronizar.',
         type: 'error',
       })
     }
@@ -384,9 +409,10 @@ export default function BodegaApp() {
       setTertiaryStatus({ loading: false, message: 'Carga eliminada.', type: 'success' })
       window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
     } catch (err) {
+      const hint = getTertiarySupabaseHint(err)
       setTertiaryStatus({
         loading: false,
-        message: err?.message ? String(err.message) : 'No se pudo eliminar la carga.',
+        message: hint ? `${String(err?.message || 'No se pudo eliminar la carga.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo eliminar la carga.',
         type: 'error',
       })
     }
@@ -460,9 +486,10 @@ export default function BodegaApp() {
         })
         window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
       } catch (err) {
+        const hint = getTertiarySupabaseHint(err)
         setTertiaryStatus({
           loading: false,
-          message: err?.message ? String(err.message) : 'Error al procesar/guardar el XLSX.',
+          message: hint ? `${String(err?.message || 'Error al procesar/guardar el XLSX.')}. ${hint}` : err?.message ? String(err.message) : 'Error al procesar/guardar el XLSX.',
           type: 'error',
         })
       }
