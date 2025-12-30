@@ -12,6 +12,7 @@ import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import OrderRequestView from './views/OrderRequestView.jsx'
 import TertiaryPackagingView from './views/TertiaryPackagingView.jsx'
 import CategoriesView from './views/CategoriesView.jsx'
+import CalendarView from './views/CalendarView.jsx'
 import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
@@ -66,6 +67,9 @@ export default function BodegaApp() {
   const [categoriesPage, setCategoriesPage] = useState(1)
   const [categoriesPageSize, setCategoriesPageSize] = useState(50)
 
+  const [calendarStatus, setCalendarStatus] = useState({ loading: false, message: '', type: '' })
+  const [orderCalendar, setOrderCalendar] = useState([])
+
   const getTertiarySupabaseHint = (err) => {
     const raw = err?.message ? String(err.message) : ''
     const isSchemaCache = raw.toLowerCase().includes('schema cache') || raw.toLowerCase().includes('could not find the table')
@@ -84,6 +88,17 @@ export default function BodegaApp() {
 
     return (
       'Parece que en Supabase aún no existe (o no se ha refrescado) la tabla `public.medication_categories`. ' +
+      'Ejecuta `supabase/schema.sql` en Supabase (SQL Editor) y luego recarga el schema con: NOTIFY pgrst, \'reload schema\';'
+    )
+  }
+
+  const getCalendarSupabaseHint = (err) => {
+    const raw = err?.message ? String(err.message) : ''
+    const isSchemaCache = raw.toLowerCase().includes('schema cache') || raw.toLowerCase().includes('could not find the table')
+    if (!isSchemaCache) return ''
+
+    return (
+      'Parece que en Supabase a\u00fan no existe (o no se ha refrescado) la tabla `public.order_calendar`. ' +
       'Ejecuta `supabase/schema.sql` en Supabase (SQL Editor) y luego recarga el schema con: NOTIFY pgrst, \'reload schema\';'
     )
   }
@@ -140,6 +155,23 @@ export default function BodegaApp() {
               message: hint
                 ? `${String(err?.message || err || 'Error al cargar Categorías.')}. ${hint}`
                 : String(err?.message || err || 'Error al cargar Categorías.'),
+              type: 'error',
+            })
+          }
+        }
+
+        try {
+          const loadedCalendar = (await store.getOrderCalendar?.()) ?? []
+          if (!cancelled) setOrderCalendar(loadedCalendar ?? [])
+        } catch (err) {
+          const hint = getCalendarSupabaseHint(err)
+          if (!cancelled) {
+            setOrderCalendar([])
+            setCalendarStatus({
+              loading: false,
+              message: hint
+                ? `${String(err?.message || err || 'Error al cargar Calendario.')}. ${hint}`
+                : String(err?.message || err || 'Error al cargar Calendario.'),
               type: 'error',
             })
           }
@@ -435,6 +467,45 @@ export default function BodegaApp() {
       setCategoriesStatus({
         loading: false,
         message: hint ? `${String(err?.message || 'No se pudo sincronizar.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo sincronizar.',
+        type: 'error',
+      })
+    }
+  }
+
+  const refreshOrderCalendar = async () => {
+    try {
+      setCalendarStatus({ loading: true, message: 'Sincronizando...', type: 'info' })
+      const next = (await store.getOrderCalendar?.()) ?? []
+      setOrderCalendar(next)
+      setCalendarStatus({ loading: false, message: `Sincronizado: ${next.length} registros.`, type: 'success' })
+      window.setTimeout(() => setCalendarStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      const hint = getCalendarSupabaseHint(err)
+      setCalendarStatus({
+        loading: false,
+        message: hint ? `${String(err?.message || 'No se pudo sincronizar.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo sincronizar.',
+        type: 'error',
+      })
+    }
+  }
+
+  const saveOrderCalendar = async (entries) => {
+    try {
+      setCalendarStatus({ loading: true, message: 'Guardando...', type: 'info' })
+      await store.upsertOrderCalendarEntries?.(entries)
+      const next = (await store.getOrderCalendar?.()) ?? []
+      setOrderCalendar(next)
+      setCalendarStatus({ loading: false, message: 'Calendario actualizado.', type: 'success' })
+      window.setTimeout(() => setCalendarStatus({ loading: false, message: '', type: '' }), 2500)
+    } catch (err) {
+      const hint = getCalendarSupabaseHint(err)
+      setCalendarStatus({
+        loading: false,
+        message: hint
+          ? `${String(err?.message || 'No se pudo guardar.')}. ${hint}`
+          : err?.message
+            ? String(err.message)
+            : 'No se pudo guardar.',
         type: 'error',
       })
     }
@@ -1711,6 +1782,15 @@ export default function BodegaApp() {
             monthlyStatus={monthlyStatus}
             onRefreshInventories={refreshInventories}
             onRefreshConsumptions={refreshMonthlyBatches}
+          />
+        )}
+
+        {activeTab === 'calendar' && (
+          <CalendarView
+            status={calendarStatus}
+            entries={orderCalendar}
+            onRefresh={refreshOrderCalendar}
+            onSave={saveOrderCalendar}
           />
         )}
 

@@ -8,6 +8,7 @@ import {
   Package,
   Pill,
   ClipboardList,
+  CalendarDays,
   Upload,
   X,
 } from 'lucide-react'
@@ -92,6 +93,14 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           id="order-request"
           icon={ClipboardList}
           label="Solicitud Pedido"
+          activeTab={activeTab}
+          isSidebarOpen={isSidebarOpen}
+          onSelect={onSelectTab}
+        />
+        <SidebarItem
+          id="calendar"
+          icon={CalendarDays}
+          label="Calendario"
           activeTab={activeTab}
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}

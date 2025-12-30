@@ -4,6 +4,7 @@ const STORAGE_KEYS = {
   selectedMonthlyBatchId: 'bodegapp:selectedMonthlyBatchId',
   tertiaryPackaging: 'bodegapp:tertiaryPackaging',
   medicationCategories: 'bodegapp:medicationCategories',
+  orderCalendar: 'bodegapp:orderCalendar',
 }
 
 const seedMedications = [
@@ -203,5 +204,37 @@ export const localStore = {
     const current = (await this.getMedicationCategories()) ?? []
     const next = current.filter((item) => String(item.id) !== String(id))
     writeJson(STORAGE_KEYS.medicationCategories, next)
+  },
+
+  async getOrderCalendar() {
+    return readArray(STORAGE_KEYS.orderCalendar) ?? []
+  },
+
+  async upsertOrderCalendarEntries(entries) {
+    const current = (await this.getOrderCalendar()) ?? []
+    const byKey = new Map(
+      current.map((item) => [`${Number(item.year) || 0}-${Number(item.month) || 0}`, item]),
+    )
+
+    for (const entry of entries ?? []) {
+      const year = Number(entry?.year) || 0
+      const month = Number(entry?.month) || 0
+      if (!year || month < 1 || month > 12) continue
+      const key = `${year}-${month}`
+      byKey.set(key, {
+        ...entry,
+        year,
+        month,
+        scheduled_receipt_date: entry?.scheduled_receipt_date ? String(entry.scheduled_receipt_date) : null,
+      })
+    }
+
+    const next = Array.from(byKey.values())
+    writeJson(STORAGE_KEYS.orderCalendar, next)
+    return next
+  },
+
+  async clearOrderCalendar() {
+    writeJson(STORAGE_KEYS.orderCalendar, [])
   },
 }

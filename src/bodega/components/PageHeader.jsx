@@ -12,6 +12,8 @@ export default function PageHeader({ activeTab }) {
               ? 'Resumen de Consumo'
     : activeTab === 'order-request'
                 ? 'Solicitud Pedido'
+    : activeTab === 'calendar'
+                  ? 'Calendario'
     : activeTab === 'tertiary-packaging'
                   ? 'Empaque Terciario'
     : activeTab === 'categories'

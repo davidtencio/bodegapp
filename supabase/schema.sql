@@ -113,6 +113,25 @@ for each row execute function public.set_updated_at();
 
 create index if not exists idx_medication_categories_siges_code on public.medication_categories (siges_code);
 
+-- Calendario de recepcion (pedido ordinario por mes)
+create table if not exists public.order_calendar (
+  id uuid primary key default gen_random_uuid(),
+  year integer not null,
+  month integer not null,
+  scheduled_receipt_date date,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint order_calendar_year_month_unique unique (year, month),
+  constraint order_calendar_month_valid check (month >= 1 and month <= 12)
+);
+
+drop trigger if exists trg_order_calendar_updated_at on public.order_calendar;
+create trigger trg_order_calendar_updated_at
+before update on public.order_calendar
+for each row execute function public.set_updated_at();
+
+create index if not exists idx_order_calendar_year_month on public.order_calendar (year, month);
+
 -- RLS (recomendado). Actualmente permite acceso a `anon` y `authenticated`.
 -- Si más adelante activas login, puedes ajustar estas policies para restringir por usuario/rol.
 alter table public.medications enable row level security;
@@ -120,6 +139,7 @@ alter table public.monthly_batches enable row level security;
 alter table public.monthly_batch_items enable row level security;
 alter table public.tertiary_packaging enable row level security;
 alter table public.medication_categories enable row level security;
+alter table public.order_calendar enable row level security;
 
 drop policy if exists "public_full_access" on public.medications;
 create policy "public_full_access"
@@ -150,6 +170,13 @@ with check (true);
 drop policy if exists "public_full_access" on public.medication_categories;
 create policy "public_full_access"
 on public.medication_categories
+for all
+to anon, authenticated
+using (true)
+with check (true);
+drop policy if exists "public_full_access" on public.order_calendar;
+create policy "public_full_access"
+on public.order_calendar
 for all
 to anon, authenticated
 using (true)

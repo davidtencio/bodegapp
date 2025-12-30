@@ -198,4 +198,38 @@ export const supabaseStore = {
     const { error } = await client.from('medication_categories').delete().eq('id', id)
     if (error) throw error
   },
+
+  async getOrderCalendar() {
+    const client = getRequiredSupabase()
+    const { data, error } = await client
+      .from('order_calendar')
+      .select('*')
+      .order('year', { ascending: true })
+      .order('month', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
+  async upsertOrderCalendarEntries(entries) {
+    const client = getRequiredSupabase()
+    const payload = (entries ?? []).map((entry) => ({
+      id: entry?.id || (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + Math.random()),
+      year: Number(entry?.year) || 0,
+      month: Number(entry?.month) || 0,
+      scheduled_receipt_date: entry?.scheduled_receipt_date ? String(entry.scheduled_receipt_date) : null,
+    }))
+
+    const filtered = payload.filter((p) => p.year && p.month >= 1 && p.month <= 12)
+    if (filtered.length === 0) return []
+
+    const { data, error } = await client.from('order_calendar').upsert(filtered, { onConflict: 'year,month' }).select('*')
+    if (error) throw error
+    return data ?? []
+  },
+
+  async clearOrderCalendar() {
+    const client = getRequiredSupabase()
+    const { error } = await client.from('order_calendar').delete().neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error) throw error
+  },
 }
