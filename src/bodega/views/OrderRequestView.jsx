@@ -253,11 +253,11 @@ export default function OrderRequestView({
       .join('')
 
     const html = `<!doctype html>
-<html>
-  <head>
-    <meta charset="utf-8" />
-    <title>${escapeHtml(title)}</title>
-    <style>
+ <html>
+   <head>
+     <meta charset="utf-8" />
+     <title>${escapeHtml(title)}</title>
+     <style>
       @page { size: A4 landscape; margin: 12mm; }
       body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #0f172a; }
       h1 { font-size: 16px; margin: 0 0 4px; }
@@ -287,15 +287,27 @@ export default function OrderRequestView({
       </thead>
       <tbody>${rowsHtml || ''}</tbody>
     </table>
-    <script>window.onload = () => { window.focus(); window.print(); };</script>
-  </body>
-</html>`
+   </body>
+ </html>`
 
-    const win = window.open('', '_blank', 'noopener,noreferrer')
-    if (!win) return
-    win.document.open()
-    win.document.write(html)
-    win.document.close()
+    const iframe = document.createElement('iframe')
+    iframe.style.position = 'fixed'
+    iframe.style.right = '0'
+    iframe.style.bottom = '0'
+    iframe.style.width = '0'
+    iframe.style.height = '0'
+    iframe.style.border = '0'
+    iframe.setAttribute('aria-hidden', 'true')
+    iframe.onload = () => {
+      try {
+        iframe.contentWindow?.focus()
+        iframe.contentWindow?.print()
+      } finally {
+        window.setTimeout(() => iframe.remove(), 1000)
+      }
+    }
+    iframe.srcdoc = html
+    document.body.appendChild(iframe)
   }
 
   return (
