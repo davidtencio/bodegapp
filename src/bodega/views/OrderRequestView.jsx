@@ -279,7 +279,7 @@ export default function OrderRequestView({
           <span className="text-xs text-slate-500">{totalItems} filas</span>
         </div>
 
-        <div className="overflow-x-auto">
+        <div className="overflow-auto max-h-[70vh]">
           <table className="w-full min-w-[860px] text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[10px] uppercase font-bold shadow-sm">
               <tr>
