@@ -23,6 +23,7 @@ export default function InventoryView({
   const selectedType = String(inventoryType || '772')
   const is771 = selectedType === '771'
   const isTotal = selectedType === 'total'
+  const medicationWidthClass = isTotal ? 'w-[260px] max-w-[260px]' : 'max-w-[620px]'
 
   const formatInventoryValue = (value) => {
     const asNumber = Number(value)
@@ -170,7 +171,7 @@ export default function InventoryView({
           <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
             <tr>
               <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
-              <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
+              <th className={`px-6 py-4 whitespace-nowrap ${medicationWidthClass}`}>Medicamento</th>
               {isTotal && <th className="px-6 py-4 text-center whitespace-nowrap">Inv. 772</th>}
               {(is771 || isTotal) && <th className="px-6 py-4 whitespace-nowrap">Lotes 771 (venc. / cant.)</th>}
               {isTotal && <th className="px-6 py-4 text-center whitespace-nowrap">Inv. 771</th>}
@@ -183,7 +184,7 @@ export default function InventoryView({
                 <td className="px-6 py-4 text-slate-700 font-mono text-center whitespace-nowrap">
                   {item.siges_code || ''}
                 </td>
-                <td className="px-6 py-4 max-w-[620px] text-slate-700">
+                <td className={`px-6 py-4 ${medicationWidthClass} text-slate-700`}>
                   <span className="block truncate">{item.name}</span>
                 </td>
                 {isTotal && (
