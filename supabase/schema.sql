@@ -95,12 +95,31 @@ for each row execute function public.set_updated_at();
 
 create index if not exists idx_tertiary_packaging_siges_code on public.tertiary_packaging (siges_code);
 
+-- Categorías por medicamento
+create table if not exists public.medication_categories (
+  id uuid primary key default gen_random_uuid(),
+  siges_code text not null,
+  medication_name text,
+  category text not null,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint medication_categories_siges_unique unique (siges_code)
+);
+
+drop trigger if exists trg_medication_categories_updated_at on public.medication_categories;
+create trigger trg_medication_categories_updated_at
+before update on public.medication_categories
+for each row execute function public.set_updated_at();
+
+create index if not exists idx_medication_categories_siges_code on public.medication_categories (siges_code);
+
 -- RLS (recomendado). Actualmente permite acceso a `anon` y `authenticated`.
 -- Si más adelante activas login, puedes ajustar estas policies para restringir por usuario/rol.
 alter table public.medications enable row level security;
 alter table public.monthly_batches enable row level security;
 alter table public.monthly_batch_items enable row level security;
 alter table public.tertiary_packaging enable row level security;
+alter table public.medication_categories enable row level security;
 
 drop policy if exists "public_full_access" on public.medications;
 create policy "public_full_access"
@@ -123,6 +142,14 @@ drop policy if exists "public_full_access" on public.monthly_batch_items;
 drop policy if exists "public_full_access" on public.tertiary_packaging;
 create policy "public_full_access"
 on public.tertiary_packaging
+for all
+to anon, authenticated
+using (true)
+with check (true);
+
+drop policy if exists "public_full_access" on public.medication_categories;
+create policy "public_full_access"
+on public.medication_categories
 for all
 to anon, authenticated
 using (true)

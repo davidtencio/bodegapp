@@ -11,6 +11,7 @@ import InventoryView from './views/InventoryView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import OrderRequestView from './views/OrderRequestView.jsx'
 import TertiaryPackagingView from './views/TertiaryPackagingView.jsx'
+import CategoriesView from './views/CategoriesView.jsx'
 import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
@@ -58,6 +59,13 @@ export default function BodegaApp() {
   const [tertiaryPage, setTertiaryPage] = useState(1)
   const [tertiaryPageSize, setTertiaryPageSize] = useState(50)
 
+  const categoriesFileInputRef = useRef(null)
+  const [categoriesStatus, setCategoriesStatus] = useState({ loading: false, message: '', type: '' })
+  const [medicationCategories, setMedicationCategories] = useState([])
+  const [categoriesSearch, setCategoriesSearch] = useState('')
+  const [categoriesPage, setCategoriesPage] = useState(1)
+  const [categoriesPageSize, setCategoriesPageSize] = useState(50)
+
   const getTertiarySupabaseHint = (err) => {
     const raw = err?.message ? String(err.message) : ''
     const isSchemaCache = raw.toLowerCase().includes('schema cache') || raw.toLowerCase().includes('could not find the table')
@@ -65,6 +73,17 @@ export default function BodegaApp() {
 
     return (
       'Parece que en Supabase aún no existe (o no se ha refrescado) la tabla `public.tertiary_packaging`. ' +
+      'Ejecuta `supabase/schema.sql` en Supabase (SQL Editor) y luego recarga el schema con: NOTIFY pgrst, \'reload schema\';'
+    )
+  }
+
+  const getCategoriesSupabaseHint = (err) => {
+    const raw = err?.message ? String(err.message) : ''
+    const isSchemaCache = raw.toLowerCase().includes('schema cache') || raw.toLowerCase().includes('could not find the table')
+    if (!isSchemaCache) return ''
+
+    return (
+      'Parece que en Supabase aún no existe (o no se ha refrescado) la tabla `public.medication_categories`. ' +
       'Ejecuta `supabase/schema.sql` en Supabase (SQL Editor) y luego recarga el schema con: NOTIFY pgrst, \'reload schema\';'
     )
   }
@@ -104,6 +123,23 @@ export default function BodegaApp() {
             setTertiaryStatus({
               loading: false,
               message: hint ? `${String(err?.message || err || 'Error al cargar Empaque Terciario.')}. ${hint}` : String(err?.message || err || 'Error al cargar Empaque Terciario.'),
+              type: 'error',
+            })
+          }
+        }
+
+        try {
+          const loadedCategories = (await store.getMedicationCategories?.()) ?? []
+          if (!cancelled) setMedicationCategories(loadedCategories ?? [])
+        } catch (err) {
+          const hint = getCategoriesSupabaseHint(err)
+          if (!cancelled) {
+            setMedicationCategories([])
+            setCategoriesStatus({
+              loading: false,
+              message: hint
+                ? `${String(err?.message || err || 'Error al cargar Categorías.')}. ${hint}`
+                : String(err?.message || err || 'Error al cargar Categorías.'),
               type: 'error',
             })
           }
@@ -387,6 +423,23 @@ export default function BodegaApp() {
     }
   }
 
+  const refreshMedicationCategories = async () => {
+    try {
+      setCategoriesStatus({ loading: true, message: 'Sincronizando...', type: 'info' })
+      const next = (await store.getMedicationCategories?.()) ?? []
+      setMedicationCategories(next)
+      setCategoriesStatus({ loading: false, message: `Sincronizado: ${next.length} registros.`, type: 'success' })
+      window.setTimeout(() => setCategoriesStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      const hint = getCategoriesSupabaseHint(err)
+      setCategoriesStatus({
+        loading: false,
+        message: hint ? `${String(err?.message || 'No se pudo sincronizar.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo sincronizar.',
+        type: 'error',
+      })
+    }
+  }
+
   const downloadTertiaryTemplateXlsx = () => {
     const rows = [
       ['CODIGO', 'MEDICAMENTO', 'EMPAQUE TERCIARIO'],
@@ -497,6 +550,159 @@ export default function BodegaApp() {
     reader.readAsArrayBuffer(file)
     e.target.value = null
   }
+
+  const normalizeCategory = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return ''
+    const normalized = raw
+      .toLowerCase()
+      .normalize('NFD')
+      .replace(/[\u0300-\u036f]/g, '')
+      .replace(/\s+/g, ' ')
+      .trim()
+
+    if (normalized === 'ordinario') return 'Ordinario'
+    if (normalized === 'frio') return 'Frío'
+    if (normalized === 'estupefaciente') return 'Estupefaciente'
+    if (normalized === 'psicotropico') return 'Psicotrópico'
+    if (normalized === 'alcohol') return 'Alcohol'
+    if (normalized === 'suero') return 'Suero'
+    if (normalized === 'compra local' || normalized === 'compralocal') return 'Compra Local'
+    return ''
+  }
+
+  const downloadCategoriesTemplateXlsx = () => {
+    const rows = [
+      ['CODIGO', 'MEDICAMENTO', 'CATEGORIA'],
+      ['110-16-0010', 'PARACETAMOL 500 MG., TABLETAS', 'Ordinario'],
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Categorias')
+    XLSX.writeFile(wb, 'categorias.xlsx')
+  }
+
+  const clearMedicationCategories = async () => {
+    const ok = window.confirm('¿Desea eliminar toda la carga de Categorías? Esta acción no se puede deshacer.')
+    if (!ok) return
+
+    try {
+      setCategoriesStatus({ loading: true, message: 'Eliminando...', type: 'info' })
+      await store.clearMedicationCategories?.()
+      setMedicationCategories([])
+      setCategoriesStatus({ loading: false, message: 'Carga eliminada.', type: 'success' })
+      window.setTimeout(() => setCategoriesStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      const hint = getCategoriesSupabaseHint(err)
+      setCategoriesStatus({
+        loading: false,
+        message: hint ? `${String(err?.message || 'No se pudo eliminar la carga.')}. ${hint}` : err?.message ? String(err.message) : 'No se pudo eliminar la carga.',
+        type: 'error',
+      })
+    }
+  }
+
+  const processMedicationCategoriesXlsx = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setCategoriesStatus({ loading: true, message: `Procesando: ${file.name}`, type: 'info' })
+
+    const reader = new FileReader()
+    reader.onerror = () => {
+      setCategoriesStatus({ loading: false, message: 'No se pudo leer el archivo.', type: 'error' })
+    }
+    reader.onload = async (evt) => {
+      try {
+        const data = evt.target?.result
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames?.[0]
+        if (!firstSheetName) throw new Error('El XLSX no tiene hojas.')
+
+        const sheet = workbook.Sheets[firstSheetName]
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, blankrows: false })
+        const dataRows = Array.isArray(rows) ? rows : []
+
+        const looksLikeHeader = (row) => {
+          const normalized = (cell) =>
+            String(cell ?? '')
+              .trim()
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]/g, '')
+          const a = normalized(row?.[0])
+          const b = normalized(row?.[1])
+          const c = normalized(row?.[2])
+          return a.includes('codigo') || a.includes('siges') || b.includes('medicamento') || c.includes('categoria')
+        }
+
+        const usable = looksLikeHeader(dataRows?.[0]) ? dataRows.slice(1) : dataRows
+
+        const imported = []
+        let unknownCategories = 0
+
+        for (let index = 0; index < usable.length; index += 1) {
+          const row = usable[index]
+          const siges_code = normalizeSigesCode(row?.[0])
+          const medication_name = String(row?.[1] ?? '').trim()
+          const category = normalizeCategory(row?.[2])
+
+          if (!siges_code) continue
+          if (!category) {
+            unknownCategories += 1
+            continue
+          }
+
+          imported.push({
+            id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + index,
+            siges_code,
+            medication_name,
+            category,
+          })
+        }
+
+        const saved = (await store.upsertMedicationCategories?.(imported)) ?? imported
+        setMedicationCategories(saved)
+        setCategoriesStatus({
+          loading: false,
+          message: `Categorías: ${imported.length} registros importados/actualizados.${unknownCategories ? ` (${unknownCategories} filas con categoría inválida omitidas)` : ''}`,
+          type: 'success',
+        })
+        window.setTimeout(() => setCategoriesStatus({ loading: false, message: '', type: '' }), 4000)
+      } catch (err) {
+        const hint = getCategoriesSupabaseHint(err)
+        setCategoriesStatus({
+          loading: false,
+          message: hint ? `${String(err?.message || 'Error al procesar/guardar el XLSX.')}. ${hint}` : err?.message ? String(err.message) : 'Error al procesar/guardar el XLSX.',
+          type: 'error',
+        })
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    e.target.value = null
+  }
+
+  const filteredMedicationCategories = useMemo(() => {
+    const query = categoriesSearch.trim().toLowerCase()
+    const normalized = (medicationCategories ?? []).map((row) => ({
+      ...row,
+      siges_code: normalizeSigesCode(row?.siges_code),
+      medication_name: String(row?.medication_name || '').trim(),
+      category: String(row?.category || '').trim(),
+    }))
+
+    if (!query) return normalized
+    return normalized.filter((row) => `${row.siges_code} ${row.medication_name} ${row.category}`.toLowerCase().includes(query))
+  }, [categoriesSearch, medicationCategories])
+
+  const paginatedMedicationCategories = useMemo(() => {
+    const size = categoriesPageSize || 50
+    const totalPages = Math.max(1, Math.ceil(filteredMedicationCategories.length / size))
+    const safePage = Math.min(Math.max(categoriesPage, 1), totalPages)
+    const start = (safePage - 1) * size
+    return filteredMedicationCategories.slice(start, start + size)
+  }, [categoriesPage, categoriesPageSize, filteredMedicationCategories])
 
   const filteredTertiaryPackaging = useMemo(() => {
     const query = tertiarySearch.trim().toLowerCase()
@@ -1486,6 +1692,37 @@ export default function BodegaApp() {
             onPageSizeChange={(size) => {
               setTertiaryPageSize(size)
               setTertiaryPage(1)
+            }}
+          />
+        )}
+
+        {activeTab === 'categories' && (
+          <CategoriesView
+            status={categoriesStatus}
+            fileInputRef={categoriesFileInputRef}
+            onChooseFile={() => categoriesFileInputRef.current?.click()}
+            onFileChange={processMedicationCategoriesXlsx}
+            onDownloadTemplate={downloadCategoriesTemplateXlsx}
+            onRefresh={refreshMedicationCategories}
+            canClear={(medicationCategories ?? []).length > 0}
+            onClear={clearMedicationCategories}
+            search={categoriesSearch}
+            onSearchChange={(value) => {
+              setCategoriesSearch(value)
+              setCategoriesPage(1)
+            }}
+            items={paginatedMedicationCategories}
+            totalItems={filteredMedicationCategories.length}
+            page={categoriesPage}
+            pageSize={categoriesPageSize}
+            onPageChange={(nextPage) => {
+              const totalPages = Math.max(1, Math.ceil(filteredMedicationCategories.length / (categoriesPageSize || 1)))
+              const safe = Math.min(Math.max(Number(nextPage) || 1, 1), totalPages)
+              setCategoriesPage(safe)
+            }}
+            onPageSizeChange={(size) => {
+              setCategoriesPageSize(size)
+              setCategoriesPage(1)
             }}
           />
         )}

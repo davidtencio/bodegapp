@@ -14,6 +14,8 @@ export default function PageHeader({ activeTab }) {
                 ? 'Solicitud Pedido'
     : activeTab === 'tertiary-packaging'
                   ? 'Empaque Terciario'
+    : activeTab === 'categories'
+                  ? 'Categorías'
                 : 'Alertas de Stock'
 
   return (

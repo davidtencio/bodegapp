@@ -2,6 +2,7 @@ import {
   AlertTriangle,
   BarChart3,
   FileSpreadsheet,
+  Tag,
   LayoutDashboard,
   Menu,
   Package,
@@ -99,6 +100,14 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           id="tertiary-packaging"
           icon={Package}
           label="Empaque Terciario"
+          activeTab={activeTab}
+          isSidebarOpen={isSidebarOpen}
+          onSelect={onSelectTab}
+        />
+        <SidebarItem
+          id="categories"
+          icon={Tag}
+          label="Categorías"
           activeTab={activeTab}
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}
