@@ -2,6 +2,7 @@ const STORAGE_KEYS = {
   medications: 'bodegapp:medications',
   monthlyBatches: 'bodegapp:monthlyBatches',
   selectedMonthlyBatchId: 'bodegapp:selectedMonthlyBatchId',
+  tertiaryPackaging: 'bodegapp:tertiaryPackaging',
 }
 
 const seedMedications = [
@@ -149,5 +150,28 @@ export const localStore = {
 
   async setSelectedMonthlyBatchId(id) {
     writeJson(STORAGE_KEYS.selectedMonthlyBatchId, id)
+  },
+
+  async getTertiaryPackaging() {
+    return readArray(STORAGE_KEYS.tertiaryPackaging) ?? []
+  },
+
+  async upsertTertiaryPackaging(items) {
+    const current = (await this.getTertiaryPackaging()) ?? []
+    const byCode = new Map(current.map((item) => [String(item.siges_code || '').trim(), item]))
+
+    for (const item of items ?? []) {
+      const code = String(item?.siges_code || '').trim()
+      if (!code) continue
+      byCode.set(code, { ...item, siges_code: code })
+    }
+
+    const next = Array.from(byCode.values())
+    writeJson(STORAGE_KEYS.tertiaryPackaging, next)
+    return next
+  },
+
+  async clearTertiaryPackaging() {
+    writeJson(STORAGE_KEYS.tertiaryPackaging, [])
   },
 }

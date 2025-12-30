@@ -10,6 +10,7 @@ import DashboardView from './views/DashboardView.jsx'
 import InventoryView from './views/InventoryView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import OrderRequestView from './views/OrderRequestView.jsx'
+import TertiaryPackagingView from './views/TertiaryPackagingView.jsx'
 import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
@@ -21,6 +22,7 @@ import {
 } from './csv.js'
 import { store } from './data/store.js'
 import { dataProvider, isSupabaseConfigured, supabaseProjectRef } from '../lib/supabaseClient.js'
+import * as XLSX from 'xlsx'
 
 export default function BodegaApp() {
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -49,6 +51,13 @@ export default function BodegaApp() {
   const [monthlyBatches, setMonthlyBatches] = useState([])
   const [selectedMonthlyBatchId, setSelectedMonthlyBatchId] = useState(null)
 
+  const tertiaryFileInputRef = useRef(null)
+  const [tertiaryStatus, setTertiaryStatus] = useState({ loading: false, message: '', type: '' })
+  const [tertiaryPackaging, setTertiaryPackaging] = useState([])
+  const [tertiarySearch, setTertiarySearch] = useState('')
+  const [tertiaryPage, setTertiaryPage] = useState(1)
+  const [tertiaryPageSize, setTertiaryPageSize] = useState(50)
+
   useEffect(() => {
     let cancelled = false
 
@@ -63,9 +72,10 @@ export default function BodegaApp() {
       })
 
       try {
-        const [loadedMedications, loadedMonthlyBatches, storedSelectedId] = await Promise.all([
+        const [loadedMedications, loadedMonthlyBatches, loadedTertiary, storedSelectedId] = await Promise.all([
           store.getMedications(),
           store.getMonthlyBatches(),
+          store.getTertiaryPackaging?.() ?? [],
           store.getSelectedMonthlyBatchId?.(),
         ])
 
@@ -73,6 +83,7 @@ export default function BodegaApp() {
         setMedications(loadedMedications ?? [])
         const normalizedBatches = (loadedMonthlyBatches ?? []).map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
         setMonthlyBatches(normalizedBatches)
+        setTertiaryPackaging(loadedTertiary ?? [])
 
         const normalizedStoredId = storedSelectedId != null ? String(storedSelectedId) : null
         const firstId = normalizedBatches?.[0]?.id ?? null
@@ -115,6 +126,24 @@ export default function BodegaApp() {
     }
 
     return raw.replace(/\s+/g, ' ')
+  }
+
+  const parseNumberLoose = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return 0
+    const compact = raw.replace(/\s/g, '')
+    const hasComma = compact.includes(',')
+    const hasDot = compact.includes('.')
+
+    let normalized = compact
+    if (hasComma && hasDot) {
+      normalized = compact.replace(/,/g, '')
+    } else if (hasComma && !hasDot) {
+      normalized = compact.replace(/,/g, '.')
+    }
+
+    const num = Number.parseFloat(normalized)
+    return Number.isFinite(num) ? num : 0
   }
 
   const lowStockItems = useMemo(
@@ -316,6 +345,159 @@ export default function BodegaApp() {
     () => (monthlyBatches ?? []).some((b) => (b?.items ?? []).length > 0),
     [monthlyBatches],
   )
+
+  const refreshTertiaryPackaging = async () => {
+    try {
+      setTertiaryStatus({ loading: true, message: 'Sincronizando...', type: 'info' })
+      const next = (await store.getTertiaryPackaging?.()) ?? []
+      setTertiaryPackaging(next)
+      setTertiaryStatus({ loading: false, message: `Sincronizado: ${next.length} registros.`, type: 'success' })
+      window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setTertiaryStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'No se pudo sincronizar.',
+        type: 'error',
+      })
+    }
+  }
+
+  const downloadTertiaryTemplateXlsx = () => {
+    const rows = [
+      ['Codigo SIGES', 'Medicamento', 'Cantidad (empaque terciario)'],
+      ['110-16-0010', 'ACETAMINOFEN 500 MG., TABLETAS', 12],
+    ]
+    const ws = XLSX.utils.aoa_to_sheet(rows)
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Empaque')
+    XLSX.writeFile(wb, 'empaque_terciario.xlsx')
+  }
+
+  const clearTertiaryPackaging = async () => {
+    const ok = window.confirm('¿Desea eliminar toda la carga de Empaque Terciario? Esta acción no se puede deshacer.')
+    if (!ok) return
+
+    try {
+      setTertiaryStatus({ loading: true, message: 'Eliminando...', type: 'info' })
+      await store.clearTertiaryPackaging?.()
+      setTertiaryPackaging([])
+      setTertiaryStatus({ loading: false, message: 'Carga eliminada.', type: 'success' })
+      window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setTertiaryStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'No se pudo eliminar la carga.',
+        type: 'error',
+      })
+    }
+  }
+
+  const processTertiaryPackagingXlsx = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setTertiaryStatus({ loading: true, message: `Procesando: ${file.name}`, type: 'info' })
+
+    const reader = new FileReader()
+    reader.onerror = () => {
+      setTertiaryStatus({ loading: false, message: 'No se pudo leer el archivo.', type: 'error' })
+    }
+    reader.onload = async (evt) => {
+      try {
+        const data = evt.target?.result
+        const workbook = XLSX.read(data, { type: 'array' })
+        const firstSheetName = workbook.SheetNames?.[0]
+        if (!firstSheetName) throw new Error('El XLSX no tiene hojas.')
+
+        const sheet = workbook.Sheets[firstSheetName]
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1, raw: false, blankrows: false })
+        const dataRows = Array.isArray(rows) ? rows : []
+
+        const looksLikeHeader = (row) => {
+          const normalized = (cell) =>
+            String(cell ?? '')
+              .trim()
+              .toLowerCase()
+              .normalize('NFD')
+              .replace(/[\u0300-\u036f]/g, '')
+              .replace(/[^a-z0-9]/g, '')
+          const a = normalized(row?.[0])
+          const b = normalized(row?.[1])
+          const c = normalized(row?.[2])
+          return a.includes('siges') || a.includes('codigo') || b.includes('medicamento') || c.includes('cantidad')
+        }
+
+        const usable = looksLikeHeader(dataRows?.[0]) ? dataRows.slice(1) : dataRows
+
+        const byMedicationName = new Map(
+          (medications ?? [])
+            .map((m) => [normalizeSigesCode(m.siges_code), String(m.name || '').trim()])
+            .filter(([code]) => Boolean(code)),
+        )
+
+        const imported = usable
+          .map((row, index) => {
+            const siges_code = normalizeSigesCode(row?.[0])
+            const medication_name_raw = String(row?.[1] ?? '').trim()
+            const medication_name = medication_name_raw || byMedicationName.get(siges_code) || ''
+            const tertiary_quantity = parseNumberLoose(row?.[2])
+            if (!siges_code) return null
+            return {
+              id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + index,
+              siges_code,
+              medication_name,
+              tertiary_quantity,
+            }
+          })
+          .filter(Boolean)
+
+        const saved = (await store.upsertTertiaryPackaging?.(imported)) ?? imported
+        setTertiaryPackaging(saved)
+        setTertiaryStatus({
+          loading: false,
+          message: `Empaque Terciario: ${imported.length} registros importados/actualizados.`,
+          type: 'success',
+        })
+        window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 4000)
+      } catch (err) {
+        setTertiaryStatus({
+          loading: false,
+          message: err?.message ? String(err.message) : 'Error al procesar/guardar el XLSX.',
+          type: 'error',
+        })
+      }
+    }
+    reader.readAsArrayBuffer(file)
+    e.target.value = null
+  }
+
+  const filteredTertiaryPackaging = useMemo(() => {
+    const query = tertiarySearch.trim().toLowerCase()
+    const withFallbackName = (tertiaryPackaging ?? []).map((row) => {
+      const code = normalizeSigesCode(row?.siges_code)
+      const fallback = (medications ?? []).find((m) => normalizeSigesCode(m.siges_code) === code)?.name
+      return {
+        ...row,
+        siges_code: code,
+        medication_name: String(row?.medication_name || fallback || '').trim(),
+        tertiary_quantity: Number(row?.tertiary_quantity) || 0,
+      }
+    })
+
+    if (!query) return withFallbackName
+    return withFallbackName.filter((row) => {
+      const haystack = `${row.siges_code} ${row.medication_name}`.toLowerCase()
+      return haystack.includes(query)
+    })
+  }, [medications, tertiaryPackaging, tertiarySearch])
+
+  const paginatedTertiaryPackaging = useMemo(() => {
+    const size = tertiaryPageSize || 50
+    const totalPages = Math.max(1, Math.ceil(filteredTertiaryPackaging.length / size))
+    const safePage = Math.min(Math.max(tertiaryPage, 1), totalPages)
+    const start = (safePage - 1) * size
+    return filteredTertiaryPackaging.slice(start, start + size)
+  }, [filteredTertiaryPackaging, tertiaryPage, tertiaryPageSize])
 
   const openNewMedication = () => {
     setEditingMed(null)
@@ -1246,6 +1428,37 @@ export default function BodegaApp() {
             monthlyStatus={monthlyStatus}
             onRefreshInventories={refreshInventories}
             onRefreshConsumptions={refreshMonthlyBatches}
+          />
+        )}
+
+        {activeTab === 'tertiary-packaging' && (
+          <TertiaryPackagingView
+            status={tertiaryStatus}
+            fileInputRef={tertiaryFileInputRef}
+            onChooseFile={() => tertiaryFileInputRef.current?.click()}
+            onFileChange={processTertiaryPackagingXlsx}
+            onDownloadTemplate={downloadTertiaryTemplateXlsx}
+            onRefresh={refreshTertiaryPackaging}
+            canClear={(tertiaryPackaging ?? []).length > 0}
+            onClear={clearTertiaryPackaging}
+            search={tertiarySearch}
+            onSearchChange={(value) => {
+              setTertiarySearch(value)
+              setTertiaryPage(1)
+            }}
+            items={paginatedTertiaryPackaging}
+            totalItems={filteredTertiaryPackaging.length}
+            page={tertiaryPage}
+            pageSize={tertiaryPageSize}
+            onPageChange={(nextPage) => {
+              const totalPages = Math.max(1, Math.ceil(filteredTertiaryPackaging.length / (tertiaryPageSize || 1)))
+              const safe = Math.min(Math.max(Number(nextPage) || 1, 1), totalPages)
+              setTertiaryPage(safe)
+            }}
+            onPageSizeChange={(size) => {
+              setTertiaryPageSize(size)
+              setTertiaryPage(1)
+            }}
           />
         )}
 

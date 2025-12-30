@@ -77,11 +77,30 @@ create table if not exists public.monthly_batch_items (
 
 create index if not exists idx_monthly_batch_items_batch_id on public.monthly_batch_items (batch_id);
 
+-- Empaque terciario (cantidad por empaque)
+create table if not exists public.tertiary_packaging (
+  id uuid primary key default gen_random_uuid(),
+  siges_code text not null,
+  medication_name text,
+  tertiary_quantity numeric not null default 0,
+  created_at timestamptz not null default now(),
+  updated_at timestamptz not null default now(),
+  constraint tertiary_packaging_siges_unique unique (siges_code)
+);
+
+drop trigger if exists trg_tertiary_packaging_updated_at on public.tertiary_packaging;
+create trigger trg_tertiary_packaging_updated_at
+before update on public.tertiary_packaging
+for each row execute function public.set_updated_at();
+
+create index if not exists idx_tertiary_packaging_siges_code on public.tertiary_packaging (siges_code);
+
 -- RLS (recomendado). Actualmente permite acceso a `anon` y `authenticated`.
 -- Si más adelante activas login, puedes ajustar estas policies para restringir por usuario/rol.
 alter table public.medications enable row level security;
 alter table public.monthly_batches enable row level security;
 alter table public.monthly_batch_items enable row level security;
+alter table public.tertiary_packaging enable row level security;
 
 drop policy if exists "public_full_access" on public.medications;
 create policy "public_full_access"
@@ -100,6 +119,14 @@ using (true)
 with check (true);
 
 drop policy if exists "public_full_access" on public.monthly_batch_items;
+
+drop policy if exists "public_full_access" on public.tertiary_packaging;
+create policy "public_full_access"
+on public.tertiary_packaging
+for all
+to anon, authenticated
+using (true)
+with check (true);
 create policy "public_full_access"
 on public.monthly_batch_items
 for all

@@ -96,6 +96,14 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           onSelect={onSelectTab}
         />
         <SidebarItem
+          id="tertiary-packaging"
+          icon={Package}
+          label="Empaque Terciario"
+          activeTab={activeTab}
+          isSidebarOpen={isSidebarOpen}
+          onSelect={onSelectTab}
+        />
+        <SidebarItem
           id="alerts"
           icon={AlertTriangle}
           label="Alertas de Stock"

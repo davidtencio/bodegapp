@@ -2,16 +2,18 @@ export default function PageHeader({ activeTab }) {
   const title =
     activeTab === 'dashboard'
       ? 'Resumen General'
-      : activeTab === 'inventory'
+    : activeTab === 'inventory'
         ? 'Gestión de Inventario'
-        : activeTab === 'catalog'
+    : activeTab === 'catalog'
           ? 'Catálogo de Productos'
-          : activeTab === 'consumption-monthly'
+    : activeTab === 'consumption-monthly'
             ? 'Consumo Mensual'
-            : activeTab === 'consumption-summary'
+    : activeTab === 'consumption-summary'
               ? 'Resumen de Consumo'
-              : activeTab === 'order-request'
+    : activeTab === 'order-request'
                 ? 'Solicitud Pedido'
+    : activeTab === 'tertiary-packaging'
+                  ? 'Empaque Terciario'
                 : 'Alertas de Stock'
 
   return (

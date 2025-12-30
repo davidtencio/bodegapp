@@ -120,4 +120,40 @@ export const supabaseStore = {
   },
 
   async setSelectedMonthlyBatchId() {},
+
+  async getTertiaryPackaging() {
+    const client = getRequiredSupabase()
+    const { data, error } = await client
+      .from('tertiary_packaging')
+      .select('*')
+      .order('siges_code', { ascending: true })
+    if (error) throw error
+    return data ?? []
+  },
+
+  async upsertTertiaryPackaging(items) {
+    const client = getRequiredSupabase()
+    const payload = (items ?? []).map((item) => ({
+      id: item?.id || (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + Math.random()),
+      siges_code: String(item?.siges_code || '').trim(),
+      medication_name: String(item?.medication_name || '').trim(),
+      tertiary_quantity: Number(item?.tertiary_quantity) || 0,
+    }))
+
+    const filtered = payload.filter((p) => Boolean(p.siges_code))
+    if (filtered.length === 0) return []
+
+    const { data, error } = await client.from('tertiary_packaging').upsert(filtered, { onConflict: 'siges_code' }).select('*')
+    if (error) throw error
+    return data ?? []
+  },
+
+  async clearTertiaryPackaging() {
+    const client = getRequiredSupabase()
+    const { error } = await client
+      .from('tertiary_packaging')
+      .delete()
+      .neq('id', '00000000-0000-0000-0000-000000000000')
+    if (error) throw error
+  },
 }
