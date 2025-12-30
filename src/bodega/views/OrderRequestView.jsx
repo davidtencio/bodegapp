@@ -62,6 +62,7 @@ function StatusBanner({ status }) {
 export default function OrderRequestView({
   medications,
   months,
+  tertiaryPackaging,
   inventoryStatus,
   monthlyStatus,
   onRefreshInventories,
@@ -76,6 +77,14 @@ export default function OrderRequestView({
   const computed = useMemo(() => {
     const lastThree = (months ?? []).slice(0, 3)
     const monthLabels = lastThree.map((m) => String(m?.label ?? '').trim()).filter(Boolean)
+
+    const tertiaryByCode = new Map()
+    for (const row of tertiaryPackaging ?? []) {
+      const code = String(row?.siges_code ?? '').trim()
+      if (!code) continue
+      const qty = toNumber(row?.tertiary_quantity)
+      if (qty > 0) tertiaryByCode.set(code, qty)
+    }
 
     const inventoryByCode = new Map()
     for (const med of medications ?? []) {
@@ -122,19 +131,27 @@ export default function OrderRequestView({
       const inventory = inventoryByCode.get(code) ?? { inv771: 0, inv772: 0 }
       const invTotal = toNumber(inventory.inv771) + toNumber(inventory.inv772)
       const pedidoRaw = consumoTotal * monthsCount - invTotal
-      const pedido = Math.max(0, pedidoRaw)
+      const pedidoBase = Math.max(0, pedidoRaw)
+      const empaqueTerciario = tertiaryByCode.get(code) ?? 0
+      const pedido =
+        empaqueTerciario > 0
+          ? pedidoBase === 0
+            ? 0
+            : Math.ceil(pedidoBase / empaqueTerciario) * empaqueTerciario
+          : pedidoBase
 
       return {
         siges_code: code,
         medication_name: m.medication_name,
         consumoTotal,
         invTotal,
+        empaqueTerciario,
         pedido,
       }
     })
 
     return { monthLabels, rows }
-  }, [medications, months, monthsToRequest])
+  }, [medications, months, monthsToRequest, tertiaryPackaging])
 
   const monthLabels = computed.monthLabels ?? []
 
@@ -270,6 +287,7 @@ export default function OrderRequestView({
                 <th className="px-4 py-4 whitespace-nowrap">Medicamento</th>
                 <th className="px-3 py-4 text-center whitespace-nowrap w-40">Consumo total</th>
                 <th className="px-3 py-4 text-center whitespace-nowrap w-40">Inventario total</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap w-40">Empaque terciario</th>
                 <th className="px-3 py-4 text-center whitespace-nowrap w-40">Pedido</th>
               </tr>
             </thead>
@@ -280,6 +298,9 @@ export default function OrderRequestView({
                   <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">{r.medication_name}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.consumoTotal)}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.invTotal)}</td>
+                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">
+                    {r.empaqueTerciario ? formatNumber(r.empaqueTerciario) : '—'}
+                  </td>
                   <td className="px-3 py-4 text-center font-mono text-sm font-bold text-blue-700 tabular-nums">
                     {formatNumber(r.pedido)}
                   </td>
@@ -287,7 +308,7 @@ export default function OrderRequestView({
               ))}
               {paginated.length === 0 && (
                 <tr>
-                  <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={6} className="px-6 py-10 text-center text-sm text-slate-400">
                     No hay resultados.
                   </td>
                 </tr>
@@ -339,4 +360,3 @@ export default function OrderRequestView({
     </div>
   )
 }
-

@@ -1451,6 +1451,7 @@ export default function BodegaApp() {
           <OrderRequestView
             medications={medications}
             months={monthlyBatches}
+            tertiaryPackaging={tertiaryPackaging}
             inventoryStatus={inventoryStatus}
             monthlyStatus={monthlyStatus}
             onRefreshInventories={refreshInventories}
