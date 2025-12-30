@@ -192,8 +192,8 @@ export default function InventoryView({
                   </td>
                 )}
                 {(is771 || isTotal) && (
-                  <td className="px-6 py-4 text-slate-600 font-mono">
-                    <div className="flex flex-col gap-1">
+                  <td className={`px-6 py-4 text-slate-600 font-mono ${isTotal ? 'text-center' : ''}`}>
+                    <div className={`flex flex-col gap-1 ${isTotal ? 'items-center' : ''}`}>
                       {Array.isArray(item.lots) && item.lots.length > 0 ? (
                         item.lots.map((lot) => (
                           <div key={lot.id || `${lot.batch}-${lot.expiry_date}`} className="whitespace-nowrap">
