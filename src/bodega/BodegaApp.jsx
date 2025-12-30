@@ -299,6 +299,21 @@ export default function BodegaApp() {
     return byCode
   }, [monthlyBatches])
 
+  const movementByCodeLast4Months = useMemo(() => {
+    const recentMonths = (monthlyBatches ?? []).filter((b) => (b?.items ?? []).length > 0).slice(0, 4)
+    const byCode = new Map()
+
+    for (const batch of recentMonths) {
+      for (const item of batch?.items ?? []) {
+        const code = String(item?.siges_code || '').trim()
+        if (!code) continue
+        byCode.set(code, (byCode.get(code) || 0) + parseNumberLoose(item?.quantity))
+      }
+    }
+
+    return byCode
+  }, [monthlyBatches])
+
   const lowStockItems = useMemo(() => {
     const today = new Date(`${todayKey}T00:00:00`)
     const daysToReceipt = nextReceiptDate ? daysBetween(today, nextReceiptDate) : null
@@ -334,11 +349,13 @@ export default function BodegaApp() {
       const code = String(entry.siges_code || '').trim()
       const stockTotal = Number(entry._sumStock) || 0
       const avgMonthly = avgMonthlyConsumptionByCode.get(code) || 0
+      const movement4m = movementByCodeLast4Months.get(code) || 0
       const avgDaily = avgMonthly / 30
       const baseMin = Number(entry.min_stock) || 0
       const computedMin = nextReceiptDate ? avgDaily * daysFactor : baseMin
       const minToUse = Number.isFinite(computedMin) ? computedMin : baseMin
 
+      if (movement4m <= 0) continue
       if (stockTotal <= minToUse) {
         results.push({
           ...entry,
@@ -354,7 +371,7 @@ export default function BodegaApp() {
         (Number(b.computed_min_stock) || 0) - (Number(b.stock) || 0) - ((Number(a.computed_min_stock) || 0) - (Number(a.stock) || 0)),
     )
     return results
-  }, [avgMonthlyConsumptionByCode, medications, nextReceiptDate, todayKey])
+  }, [avgMonthlyConsumptionByCode, medications, movementByCodeLast4Months, nextReceiptDate, todayKey])
 
   const stats = useMemo(
     () => ({
