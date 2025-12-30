@@ -157,10 +157,18 @@ export default function InventoryView({
                   <span className="block truncate font-medium text-slate-700">{item.name}</span>
                 </td>
                 {is771 && (
-                  <td className="px-6 py-4 text-sm text-slate-600 font-mono whitespace-nowrap">
-                    {Array.isArray(item.lots) && item.lots.length > 0
-                      ? item.lots.map(formatLotLine).join(' | ')
-                      : formatLotLine(item)}
+                  <td className="px-6 py-4 text-sm text-slate-600 font-mono">
+                    <div className="flex flex-col gap-1">
+                      {Array.isArray(item.lots) && item.lots.length > 0 ? (
+                        item.lots.map((lot) => (
+                          <div key={lot.id || `${lot.batch}-${lot.expiry_date}`} className="whitespace-nowrap">
+                            {formatLotLine(lot)}
+                          </div>
+                        ))
+                      ) : (
+                        <div className="whitespace-nowrap">{formatLotLine(item)}</div>
+                      )}
+                    </div>
                   </td>
                 )}
                 <td className="px-6 py-4 text-center whitespace-nowrap">
