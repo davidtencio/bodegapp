@@ -20,7 +20,9 @@ export default function InventoryView({
   onPageChange,
   onPageSizeChange,
 }) {
-  const is771 = String(inventoryType || '772') === '771'
+  const selectedType = String(inventoryType || '772')
+  const is771 = selectedType === '771'
+  const isTotal = selectedType === 'total'
 
   const formatInventoryValue = (value) => {
     const asNumber = Number(value)
@@ -66,30 +68,27 @@ export default function InventoryView({
       <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3">
         <div className="flex flex-wrap gap-3 items-center justify-between">
           <div className="flex items-center gap-2">
-            {['772', '771'].map((type) => (
+            {[
+              { key: '772', label: 'Inventario 772' },
+              { key: '771', label: 'Inventario 771' },
+              { key: 'total', label: 'Inventario total' },
+            ].map((opt) => (
               <button
-                key={type}
+                key={opt.key}
                 type="button"
-                onClick={() => onInventoryTypeChange?.(type)}
+                onClick={() => onInventoryTypeChange?.(opt.key)}
                 className={`px-3 py-1.5 rounded-lg text-xs font-bold border transition-colors ${
-                  String(inventoryType || '772') === type
+                  selectedType === opt.key
                     ? 'bg-blue-600 text-white border-blue-600'
                     : 'bg-white text-slate-600 border-slate-200 hover:bg-blue-50 hover:text-blue-700'
                 }`}
               >
-                Inventario {type}
+                {opt.label}
               </button>
             ))}
           </div>
 
           <div className="flex items-center gap-2">
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={onFileChange}
-              accept={is771 ? '.xml' : '.csv'}
-              className="hidden"
-            />
             <button
               type="button"
               onClick={onRefresh}
@@ -99,32 +98,43 @@ export default function InventoryView({
               <RefreshCcw size={14} />
               Sincronizar
             </button>
-            <button
-              type="button"
-              onClick={onChooseFile}
-              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
-            >
-              <Upload size={14} />
-              {is771 ? 'Cargar XML' : 'Cargar CSV'}
-            </button>
-            <button
-              type="button"
-              onClick={() => onDownloadTemplate?.(inventoryType)}
-              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2"
-            >
-              <Download size={14} />
-              Plantilla
-            </button>
-            <button
-              type="button"
-              onClick={() => onClearInventory?.(inventoryType)}
-              disabled={!canClear}
-              className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white"
-              title="Eliminar toda la carga de este inventario"
-            >
-              <Trash2 size={14} />
-              Eliminar carga
-            </button>
+            {!isTotal && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  onChange={onFileChange}
+                  accept={is771 ? '.xml' : '.csv'}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={onChooseFile}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-blue-50 hover:text-blue-700 flex items-center gap-2"
+                >
+                  <Upload size={14} />
+                  {is771 ? 'Cargar XML' : 'Cargar CSV'}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onDownloadTemplate?.(inventoryType)}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2"
+                >
+                  <Download size={14} />
+                  Plantilla
+                </button>
+                <button
+                  type="button"
+                  onClick={() => onClearInventory?.(inventoryType)}
+                  disabled={!canClear}
+                  className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-red-200 text-red-600 hover:bg-red-50 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white"
+                  title="Eliminar toda la carga de este inventario"
+                >
+                  <Trash2 size={14} />
+                  Eliminar carga
+                </button>
+              </>
+            )}
           </div>
         </div>
 
@@ -161,8 +171,10 @@ export default function InventoryView({
             <tr>
               <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
               <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
-              {is771 && <th className="px-6 py-4 whitespace-nowrap">Lotes (venc. / cant.)</th>}
-              <th className="px-6 py-4 text-center whitespace-nowrap">{is771 ? 'Inventario total' : 'Inventario'}</th>
+              {isTotal && <th className="px-6 py-4 text-center whitespace-nowrap">Inv. 772</th>}
+              {(is771 || isTotal) && <th className="px-6 py-4 whitespace-nowrap">Lotes 771 (venc. / cant.)</th>}
+              {isTotal && <th className="px-6 py-4 text-center whitespace-nowrap">Inv. 771</th>}
+              <th className="px-6 py-4 text-center whitespace-nowrap">{isTotal ? 'Inventario total' : 'Inventario'}</th>
             </tr>
           </thead>
           <tbody className="divide-y divide-slate-100">
@@ -174,7 +186,12 @@ export default function InventoryView({
                 <td className="px-6 py-4 max-w-[620px] text-slate-700">
                   <span className="block truncate">{item.name}</span>
                 </td>
-                {is771 && (
+                {isTotal && (
+                  <td className="px-6 py-4 text-center whitespace-nowrap text-slate-700 font-mono">
+                    {formatInventoryValue(item.stock772)}
+                  </td>
+                )}
+                {(is771 || isTotal) && (
                   <td className="px-6 py-4 text-slate-600 font-mono">
                     <div className="flex flex-col gap-1">
                       {Array.isArray(item.lots) && item.lots.length > 0 ? (
@@ -184,9 +201,14 @@ export default function InventoryView({
                           </div>
                         ))
                       ) : (
-                        <div className="whitespace-nowrap">{formatLotLine(item)}</div>
+                        <div className="whitespace-nowrap">{isTotal ? '—' : formatLotLine(item)}</div>
                       )}
                     </div>
+                  </td>
+                )}
+                {isTotal && (
+                  <td className="px-6 py-4 text-center whitespace-nowrap text-slate-700 font-mono">
+                    {formatInventoryValue(item.stock771)}
                   </td>
                 )}
                 <td className="px-6 py-4 text-center whitespace-nowrap text-slate-800">
@@ -196,7 +218,10 @@ export default function InventoryView({
             ))}
             {items.length === 0 && (
               <tr>
-                <td colSpan={is771 ? 4 : 3} className="px-6 py-10 text-center text-sm text-slate-400">
+                <td
+                  colSpan={isTotal ? 6 : is771 ? 4 : 3}
+                  className="px-6 py-10 text-center text-sm text-slate-400"
+                >
                   No hay resultados para &quot;{search}&quot;.
                 </td>
               </tr>

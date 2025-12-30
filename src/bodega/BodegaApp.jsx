@@ -121,63 +121,133 @@ export default function BodegaApp() {
 
   const filteredInventory = useMemo(() => {
     const selectedType = String(inventoryType || '772')
-    const base = medications.filter((m) => String(m.inventory_type || '772') === selectedType)
     const query = inventorySearch.trim().toLowerCase()
 
-    if (selectedType !== '771') {
-      if (!query) return base
-      return base.filter((m) => {
-        const haystack =
-          `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
-        return haystack.includes(query)
-      })
+    const normalizeMergeKey = ({ siges_code, name }) => {
+      const code = String(siges_code || '').trim()
+      if (code) return `code:${code.toLowerCase()}`
+      const n = String(name || '').trim().toLowerCase()
+      return n ? `name:${n}` : ''
     }
 
-    const grouped = []
-    const byKey = new Map()
-    for (const m of base) {
-      const code = String(m.siges_code || '').trim()
-      const name = String(m.name || '').trim()
-      const key = `${code}||${name}`.toLowerCase()
-      const entry = byKey.get(key)
-      const lot = {
-        id: m.id,
-        batch: String(m.batch || '').trim() || 'S/N',
-        expiry_date: m.expiry_date ? String(m.expiry_date).trim() : '',
-        stock: Number(m.stock) || 0,
-      }
-
-      if (entry) {
-        entry.lots.push(lot)
-        entry.stock += lot.stock
-      } else {
-        const row = {
-          id: `group:${key}`,
-          inventory_type: selectedType,
-          siges_code: code,
-          name,
-          lots: [lot],
-          stock: lot.stock,
-        }
-        byKey.set(key, row)
-        grouped.push(row)
-      }
-    }
-
-    for (const row of grouped) {
-      row.lots.sort((a, b) => {
+    const sortLots = (lots) => {
+      lots.sort((a, b) => {
         const batchCmp = String(a.batch).localeCompare(String(b.batch))
         if (batchCmp !== 0) return batchCmp
         return String(a.expiry_date).localeCompare(String(b.expiry_date))
       })
     }
 
-    if (!query) return grouped
-    return grouped.filter((row) => {
-      const lots = row.lots
-        .map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`)
-        .join(' ')
-      const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
+    const group771 = (rows) => {
+      const grouped = []
+      const byKey = new Map()
+      for (const m of rows) {
+        const code = String(m.siges_code || '').trim()
+        const name = String(m.name || '').trim()
+        const key = `${code}||${name}`.toLowerCase()
+        const entry = byKey.get(key)
+        const lot = {
+          id: m.id,
+          batch: String(m.batch || '').trim() || 'S/N',
+          expiry_date: m.expiry_date ? String(m.expiry_date).trim() : '',
+          stock: Number(m.stock) || 0,
+        }
+
+        if (entry) {
+          entry.lots.push(lot)
+          entry.stock += lot.stock
+        } else {
+          const row = {
+            id: `group:${key}`,
+            inventory_type: '771',
+            siges_code: code,
+            name,
+            lots: [lot],
+            stock: lot.stock,
+          }
+          byKey.set(key, row)
+          grouped.push(row)
+        }
+      }
+
+      for (const row of grouped) sortLots(row.lots)
+      return grouped
+    }
+
+    if (selectedType === '771') {
+      const base771 = medications.filter((m) => String(m.inventory_type || '772') === '771')
+      const grouped771 = group771(base771)
+      if (!query) return grouped771
+      return grouped771.filter((row) => {
+        const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
+        const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
+        return haystack.includes(query)
+      })
+    }
+
+    if (selectedType === 'total') {
+      const combined = new Map()
+
+      const upsertEntry = ({ siges_code, name }) => {
+        const key = normalizeMergeKey({ siges_code, name })
+        if (!key) return null
+        const existing = combined.get(key)
+        if (existing) return existing
+        const entry = {
+          id: `total:${key}`,
+          inventory_type: 'total',
+          siges_code: String(siges_code || '').trim(),
+          name: String(name || '').trim(),
+          lots: [],
+          stock772: 0,
+          stock771: 0,
+          stock: 0,
+        }
+        combined.set(key, entry)
+        return entry
+      }
+
+      for (const m of medications) {
+        const t = String(m.inventory_type || '772')
+        if (t !== '771' && t !== '772') continue
+
+        const entry = upsertEntry({ siges_code: m.siges_code, name: m.name })
+        if (!entry) continue
+        if (!entry.siges_code) entry.siges_code = String(m.siges_code || '').trim()
+        if (!entry.name) entry.name = String(m.name || '').trim()
+
+        if (t === '772') {
+          entry.stock772 += Number(m.stock) || 0
+        } else {
+          const lot = {
+            id: m.id,
+            batch: String(m.batch || '').trim() || 'S/N',
+            expiry_date: m.expiry_date ? String(m.expiry_date).trim() : '',
+            stock: Number(m.stock) || 0,
+          }
+          entry.lots.push(lot)
+          entry.stock771 += lot.stock
+        }
+      }
+
+      const merged = Array.from(combined.values()).map((entry) => {
+        sortLots(entry.lots)
+        entry.stock = entry.stock772 + entry.stock771
+        return entry
+      })
+
+      if (!query) return merged
+      return merged.filter((row) => {
+        const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
+        const haystack = `${row.siges_code} ${row.name} ${row.stock772} ${row.stock771} ${row.stock} ${lots}`.toLowerCase()
+        return haystack.includes(query)
+      })
+    }
+
+    const base = medications.filter((m) => String(m.inventory_type || '772') === selectedType)
+    if (!query) return base
+    return base.filter((m) => {
+      const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
       return haystack.includes(query)
     })
   }, [inventorySearch, medications, inventoryType])
@@ -194,6 +264,7 @@ export default function BodegaApp() {
 
   const inventoryCountForType = useMemo(() => {
     const selectedType = String(inventoryType || '772')
+    if (selectedType === 'total') return filteredInventory.length
     if (selectedType !== '771') {
       return medications.filter((m) => String(m.inventory_type || '772') === selectedType).length
     }
@@ -742,6 +813,7 @@ export default function BodegaApp() {
 
   const downloadInventoryTemplate = (type) => {
     const selectedType = String(type || inventoryType || '772')
+    if (selectedType === 'total') return
     if (selectedType === '771') return downloadInventoryTemplateXml(selectedType)
     return downloadInventoryTemplateCsv(selectedType)
   }
@@ -751,6 +823,11 @@ export default function BodegaApp() {
     if (!file) return
 
     const selectedType = String(inventoryType || '772')
+    if (selectedType === 'total') {
+      setInventoryStatus({ loading: false, message: 'Inventario total no admite carga de archivos.', type: 'error' })
+      e.target.value = null
+      return
+    }
     const filename = String(file.name || '').toLowerCase()
     const isXml = filename.endsWith('.xml')
     const isCsv = filename.endsWith('.csv')
@@ -818,6 +895,7 @@ export default function BodegaApp() {
 
   const clearInventory = async (type) => {
     const selectedType = String(type || inventoryType || '772')
+    if (selectedType === 'total') return
     const ok = window.confirm(
       `¿Desea eliminar toda la carga del inventario ${selectedType}? Esta acción no se puede deshacer.`,
     )
@@ -1075,7 +1153,7 @@ export default function BodegaApp() {
             onFileChange={processInventoryFile}
             onDownloadTemplate={downloadInventoryTemplate}
             onRefresh={refreshInventories}
-            canClear={inventoryCountForType > 0}
+            canClear={String(inventoryType || '772') !== 'total' && inventoryCountForType > 0}
             onClearInventory={clearInventory}
             search={inventorySearch}
             onSearchChange={(value) => {
