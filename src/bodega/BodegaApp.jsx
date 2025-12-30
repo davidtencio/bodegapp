@@ -64,6 +64,16 @@ function getNextScheduledReceiptDate(entries, todayKey) {
   return best ?? null
 }
 
+function parseIsoDateMs(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return null
+  const iso = raw.slice(0, 10)
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return null
+  const d = new Date(`${iso}T00:00:00`)
+  const ms = d.getTime()
+  return Number.isFinite(ms) ? ms : null
+}
+
 export default function BodegaApp() {
   const [todayKey, setTodayKey] = useState(() => new Date().toISOString().slice(0, 10))
   const [activeTab, setActiveTab] = useState('dashboard')
@@ -327,19 +337,40 @@ export default function BodegaApp() {
       const stock = Number(m?.stock) || 0
       const minStockBase = Number(m?.min_stock) || 0
       const name = String(m?.name || '').trim()
+      const expiryMs = parseIsoDateMs(m?.expiry_date)
       const preferred =
         !existing ||
         (String(existing?.inventory_type || '772') !== '772' && String(m?.inventory_type || '772') === '772')
 
       if (!existing) {
-        byCode.set(code, { ...m, siges_code: code, name, stock, min_stock: minStockBase, _sumStock: stock })
+        byCode.set(code, {
+          ...m,
+          siges_code: code,
+          name,
+          stock,
+          min_stock: minStockBase,
+          _sumStock: stock,
+          _minExpiryMs: expiryMs,
+          nearest_expiry_date: expiryMs ? String(m?.expiry_date).slice(0, 10) : '',
+        })
       } else {
+        const existingMin = existing?._minExpiryMs ?? null
+        const nextMin = expiryMs == null ? existingMin : existingMin == null ? expiryMs : Math.min(existingMin, expiryMs)
+        const nextExpiryDate =
+          nextMin == null
+            ? ''
+            : nextMin === existingMin
+              ? String(existing?.nearest_expiry_date || '')
+              : String(m?.expiry_date || '').slice(0, 10)
+
         byCode.set(code, {
           ...(preferred ? { ...existing, ...m } : existing),
           siges_code: code,
           name: preferred ? name || existing.name : existing.name,
           min_stock: Math.max(existing.min_stock || 0, minStockBase),
           _sumStock: (existing._sumStock || 0) + stock,
+          _minExpiryMs: nextMin,
+          nearest_expiry_date: nextExpiryDate,
         })
       }
     }
