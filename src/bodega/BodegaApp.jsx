@@ -123,9 +123,61 @@ export default function BodegaApp() {
     const selectedType = String(inventoryType || '772')
     const base = medications.filter((m) => String(m.inventory_type || '772') === selectedType)
     const query = inventorySearch.trim().toLowerCase()
-    if (!query) return base
-    return base.filter((m) => {
-      const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
+
+    if (selectedType !== '771') {
+      if (!query) return base
+      return base.filter((m) => {
+        const haystack =
+          `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
+        return haystack.includes(query)
+      })
+    }
+
+    const grouped = []
+    const byKey = new Map()
+    for (const m of base) {
+      const code = String(m.siges_code || '').trim()
+      const name = String(m.name || '').trim()
+      const key = `${code}||${name}`.toLowerCase()
+      const entry = byKey.get(key)
+      const lot = {
+        id: m.id,
+        batch: String(m.batch || '').trim() || 'S/N',
+        expiry_date: m.expiry_date ? String(m.expiry_date).trim() : '',
+        stock: Number(m.stock) || 0,
+      }
+
+      if (entry) {
+        entry.lots.push(lot)
+        entry.stock += lot.stock
+      } else {
+        const row = {
+          id: `group:${key}`,
+          inventory_type: selectedType,
+          siges_code: code,
+          name,
+          lots: [lot],
+          stock: lot.stock,
+        }
+        byKey.set(key, row)
+        grouped.push(row)
+      }
+    }
+
+    for (const row of grouped) {
+      row.lots.sort((a, b) => {
+        const batchCmp = String(a.batch).localeCompare(String(b.batch))
+        if (batchCmp !== 0) return batchCmp
+        return String(a.expiry_date).localeCompare(String(b.expiry_date))
+      })
+    }
+
+    if (!query) return grouped
+    return grouped.filter((row) => {
+      const lots = row.lots
+        .map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`)
+        .join(' ')
+      const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
       return haystack.includes(query)
     })
   }, [inventorySearch, medications, inventoryType])
@@ -142,8 +194,11 @@ export default function BodegaApp() {
 
   const inventoryCountForType = useMemo(() => {
     const selectedType = String(inventoryType || '772')
-    return medications.filter((m) => String(m.inventory_type || '772') === selectedType).length
-  }, [inventoryType, medications])
+    if (selectedType !== '771') {
+      return medications.filter((m) => String(m.inventory_type || '772') === selectedType).length
+    }
+    return filteredInventory.length
+  }, [filteredInventory, inventoryType, medications])
 
   const openNewMedication = () => {
     setEditingMed(null)

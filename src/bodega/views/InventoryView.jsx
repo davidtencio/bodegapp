@@ -28,6 +28,14 @@ export default function InventoryView({
     return String(value ?? '0')
   }
 
+  const formatLotLine = (lot) => {
+    if (!lot) return ''
+    const batch = String(lot.batch || '').trim() || 'S/N'
+    const expiry = String(lot.expiry_date || '').trim() || 'S/N'
+    const qty = formatInventoryValue(lot.stock)
+    return `${batch} (${expiry}): ${qty}`
+  }
+
   const total = Number(totalItems) || 0
   const size = Number(pageSize) || 50
   const totalPages = Math.max(1, Math.ceil(total / size))
@@ -131,47 +139,43 @@ export default function InventoryView({
 
       <div className="overflow-x-auto">
         <table className="min-w-max w-full text-left">
-        <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
-          <tr>
-            <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
-            <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
-            {is771 && <th className="px-6 py-4 text-center whitespace-nowrap">Lote</th>}
-            {is771 && <th className="px-6 py-4 text-center whitespace-nowrap">Vencimiento</th>}
-            <th className="px-6 py-4 text-center whitespace-nowrap">Inventario</th>
-          </tr>
-        </thead>
-        <tbody className="divide-y divide-slate-100">
-          {items.map((item) => (
-            <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
-              <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center whitespace-nowrap">
-                {item.siges_code || ''}
-              </td>
-              <td className="px-6 py-4 max-w-[620px]">
-                <span className="block truncate font-medium text-slate-700">{item.name}</span>
-              </td>
-              {is771 && (
-                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center whitespace-nowrap">
-                  {item.batch || ''}
-                </td>
-              )}
-              {is771 && (
-                <td className="px-6 py-4 text-sm text-slate-600 font-mono text-center whitespace-nowrap">
-                  {item.expiry_date || ''}
-                </td>
-              )}
-              <td className="px-6 py-4 text-center whitespace-nowrap">
-                <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
-              </td>
-            </tr>
-          ))}
-          {items.length === 0 && (
+          <thead className="bg-slate-50 text-slate-500 text-[10px] uppercase font-bold">
             <tr>
-              <td colSpan={is771 ? 5 : 3} className="px-6 py-10 text-center text-sm text-slate-400">
-                No hay resultados para “{search}”.
-              </td>
+              <th className="px-6 py-4 text-center whitespace-nowrap">Código SIGES</th>
+              <th className="px-6 py-4 whitespace-nowrap">Medicamento</th>
+              {is771 && <th className="px-6 py-4 whitespace-nowrap">Lotes (venc. / cant.)</th>}
+              <th className="px-6 py-4 text-center whitespace-nowrap">{is771 ? 'Inventario total' : 'Inventario'}</th>
             </tr>
-          )}
-        </tbody>
+          </thead>
+          <tbody className="divide-y divide-slate-100">
+            {items.map((item) => (
+              <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                <td className="px-6 py-4 text-sm text-slate-700 font-mono text-center whitespace-nowrap">
+                  {item.siges_code || ''}
+                </td>
+                <td className="px-6 py-4 max-w-[620px]">
+                  <span className="block truncate font-medium text-slate-700">{item.name}</span>
+                </td>
+                {is771 && (
+                  <td className="px-6 py-4 text-sm text-slate-600 font-mono whitespace-nowrap">
+                    {Array.isArray(item.lots) && item.lots.length > 0
+                      ? item.lots.map(formatLotLine).join(' | ')
+                      : formatLotLine(item)}
+                  </td>
+                )}
+                <td className="px-6 py-4 text-center whitespace-nowrap">
+                  <span className="font-bold text-slate-800">{formatInventoryValue(item.stock)}</span>
+                </td>
+              </tr>
+            ))}
+            {items.length === 0 && (
+              <tr>
+                <td colSpan={is771 ? 4 : 3} className="px-6 py-10 text-center text-sm text-slate-400">
+                  No hay resultados para &quot;{search}&quot;.
+                </td>
+              </tr>
+            )}
+          </tbody>
         </table>
       </div>
 
@@ -200,9 +204,7 @@ export default function InventoryView({
           >
             Anterior
           </button>
-          <span className="text-xs text-slate-600">
-            Página {currentPage} de {totalPages}
-          </span>
+          <span className="text-xs text-slate-600">Página {currentPage} de {totalPages}</span>
           <button
             type="button"
             onClick={() => onPageChange?.(currentPage + 1)}
