@@ -616,6 +616,28 @@ export default function BodegaApp() {
     }
   }
 
+  const upsertTertiaryItem = async (item) => {
+    try {
+      setTertiaryStatus({ loading: true, message: 'Guardando...', type: 'info' })
+      await store.upsertTertiaryPackaging?.([item])
+      const next = (await store.getTertiaryPackaging?.()) ?? []
+      setTertiaryPackaging(next)
+      setTertiaryStatus({ loading: false, message: 'Empaque terciario actualizado.', type: 'success' })
+      window.setTimeout(() => setTertiaryStatus({ loading: false, message: '', type: '' }), 2500)
+    } catch (err) {
+      const hint = getTertiarySupabaseHint(err)
+      setTertiaryStatus({
+        loading: false,
+        message: hint
+          ? `${String(err?.message || 'No se pudo guardar.')}. ${hint}`
+          : err?.message
+            ? String(err.message)
+            : 'No se pudo guardar.',
+        type: 'error',
+      })
+    }
+  }
+
   const refreshMedicationCategories = async () => {
     try {
       setCategoriesStatus({ loading: true, message: 'Sincronizando...', type: 'info' })
@@ -1966,6 +1988,7 @@ export default function BodegaApp() {
             onRefresh={refreshTertiaryPackaging}
             canClear={(tertiaryPackaging ?? []).length > 0}
             onClear={clearTertiaryPackaging}
+            onEdit={upsertTertiaryItem}
             search={tertiarySearch}
             onSearchChange={(value) => {
               setTertiarySearch(value)
