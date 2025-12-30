@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Download, RefreshCcw, Search, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, Eye, EyeOff, RefreshCcw, Search, Trash2, Upload } from 'lucide-react'
 
 export default function InventoryView({
   inventoryType,
@@ -11,6 +11,9 @@ export default function InventoryView({
   onRefresh,
   canClear,
   onClearInventory,
+  hideNoMovement,
+  canToggleHideNoMovement,
+  onToggleHideNoMovement,
   search,
   onSearchChange,
   items,
@@ -99,6 +102,22 @@ export default function InventoryView({
               <RefreshCcw size={14} />
               Sincronizar
             </button>
+            {isTotal && (
+              <button
+                type="button"
+                onClick={() => onToggleHideNoMovement?.()}
+                disabled={!canToggleHideNoMovement}
+                className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white"
+                title={
+                  canToggleHideNoMovement
+                    ? 'Oculta medicamentos sin consumo en los últimos 4 meses.'
+                    : 'No hay consumos cargados para filtrar.'
+                }
+              >
+                {hideNoMovement ? <Eye size={14} /> : <EyeOff size={14} />}
+                {hideNoMovement ? 'Mostrar sin movimiento' : 'Ocultar sin movimiento (4 meses)'}
+              </button>
+            )}
             {!isTotal && (
               <>
                 <input

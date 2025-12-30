@@ -29,6 +29,7 @@ export default function BodegaApp() {
   const [medications, setMedications] = useState([])
   const [inventorySearch, setInventorySearch] = useState('')
   const [inventoryType, setInventoryType] = useState('772')
+  const [hideInventoryTotalNoMovement, setHideInventoryTotalNoMovement] = useState(false)
   const [inventoryPageSize, setInventoryPageSize] = useState(50)
   const [inventoryPageByType, setInventoryPageByType] = useState({ '771': 1, '772': 1 })
 
@@ -102,6 +103,18 @@ export default function BodegaApp() {
     const nextId = id == null ? null : String(id)
     setSelectedMonthlyBatchId(nextId)
     store.setSelectedMonthlyBatchId?.(nextId)
+  }
+
+  const normalizeSigesCode = (value) => {
+    const raw = String(value ?? '').trim()
+    if (!raw) return ''
+
+    const digits = raw.replace(/\D/g, '')
+    if (digits.length === 9) {
+      return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`
+    }
+
+    return raw.replace(/\s+/g, ' ')
   }
 
   const lowStockItems = useMemo(
@@ -186,6 +199,25 @@ export default function BodegaApp() {
     }
 
     if (selectedType === 'total') {
+      const movementByCodeLast4Months = (() => {
+        const candidates = (monthlyBatches ?? []).slice().sort((a, b) => {
+          const aDate = new Date(a?.created_at || a?.updated_at || 0).getTime()
+          const bDate = new Date(b?.created_at || b?.updated_at || 0).getTime()
+          return bDate - aDate
+        })
+        const recent = candidates.slice(0, 4)
+        const byCode = new Map()
+        for (const batch of recent) {
+          for (const item of batch?.items ?? []) {
+            const code = normalizeSigesCode(item?.siges_code)
+            if (!code) continue
+            const qty = Number(item?.quantity) || 0
+            byCode.set(code, (byCode.get(code) || 0) + qty)
+          }
+        }
+        return byCode
+      })()
+
       const combined = new Map()
 
       const upsertEntry = ({ siges_code, name }) => {
@@ -236,8 +268,17 @@ export default function BodegaApp() {
         return entry
       })
 
-      if (!query) return merged
-      return merged.filter((row) => {
+      const hasAnyMonthlyData = (monthlyBatches ?? []).some((b) => (b?.items ?? []).length > 0)
+      const filteredForMovement = hideInventoryTotalNoMovement && hasAnyMonthlyData
+        ? merged.filter((row) => {
+            const code = String(row.siges_code || '').trim()
+            if (!code) return false
+            return (movementByCodeLast4Months.get(code) || 0) > 0
+          })
+        : merged
+
+      if (!query) return filteredForMovement
+      return filteredForMovement.filter((row) => {
         const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
         const haystack = `${row.siges_code} ${row.name} ${row.stock772} ${row.stock771} ${row.stock} ${lots}`.toLowerCase()
         return haystack.includes(query)
@@ -250,7 +291,7 @@ export default function BodegaApp() {
       const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
       return haystack.includes(query)
     })
-  }, [inventorySearch, medications, inventoryType])
+  }, [hideInventoryTotalNoMovement, inventorySearch, medications, inventoryType, monthlyBatches])
 
   const inventoryPage = inventoryPageByType?.[String(inventoryType || '772')] ?? 1
 
@@ -270,6 +311,11 @@ export default function BodegaApp() {
     }
     return filteredInventory.length
   }, [filteredInventory, inventoryType, medications])
+
+  const canFilterInventoryTotalNoMovement = useMemo(
+    () => (monthlyBatches ?? []).some((b) => (b?.items ?? []).length > 0),
+    [monthlyBatches],
+  )
 
   const openNewMedication = () => {
     setEditingMed(null)
@@ -375,18 +421,6 @@ export default function BodegaApp() {
 
     const num = Number.parseFloat(normalized)
     return Number.isFinite(num) ? num : 0
-  }
-
-  const normalizeSigesCode = (value) => {
-    const raw = String(value ?? '').trim()
-    if (!raw) return ''
-
-    const digits = raw.replace(/\D/g, '')
-    if (digits.length === 9) {
-      return `${digits.slice(0, 3)}-${digits.slice(3, 5)}-${digits.slice(5, 9)}`
-    }
-
-    return raw.replace(/\s+/g, ' ')
   }
 
   const normalizeDateFromXml = (value) => {
@@ -1155,6 +1189,12 @@ export default function BodegaApp() {
             onRefresh={refreshInventories}
             canClear={String(inventoryType || '772') !== 'total' && inventoryCountForType > 0}
             onClearInventory={clearInventory}
+            hideNoMovement={hideInventoryTotalNoMovement}
+            canToggleHideNoMovement={canFilterInventoryTotalNoMovement}
+            onToggleHideNoMovement={() => {
+              setHideInventoryTotalNoMovement((prev) => !prev)
+              setInventoryPageByType((prev) => ({ ...prev, total: 1 }))
+            }}
             search={inventorySearch}
             onSearchChange={(value) => {
               setInventorySearch(value)
