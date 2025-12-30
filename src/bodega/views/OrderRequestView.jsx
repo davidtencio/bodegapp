@@ -42,6 +42,13 @@ function startsWith110(code) {
   return String(code || '').trim().startsWith('110')
 }
 
+function truncateText(value, maxChars) {
+  const text = String(value ?? '')
+  const limit = Math.max(0, Number(maxChars) || 0)
+  if (!limit || text.length <= limit) return text
+  return `${text.slice(0, limit)}…`
+}
+
 function StatusBanner({ status }) {
   if (!status?.message) return null
 
@@ -73,6 +80,7 @@ export default function OrderRequestView({
   const [search, setSearch] = useState('')
   const [hideZeroOrder, setHideZeroOrder] = useState(true)
   const [categoryFilter, setCategoryFilter] = useState('Todas')
+  const [coverageDaysLimit, setCoverageDaysLimit] = useState(0)
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(1)
 
@@ -178,9 +186,20 @@ export default function OrderRequestView({
         : categoryFilter === 'Sin categoría'
           ? basePre.filter((r) => !String(r.category || '').trim())
           : basePre.filter((r) => String(r.category || '').trim() === categoryFilter)
+    const baseWithCoverage =
+      coverageDaysLimit > 0
+        ? baseWithCategory.filter((r) => {
+            const consumoTotal = toNumber(r.consumoTotal)
+            if (consumoTotal <= 0) return false
+            const invTotal = toNumber(r.invTotal)
+            const coverageDays = (invTotal * 30) / consumoTotal
+            return coverageDays <= coverageDaysLimit
+          })
+        : baseWithCategory
+
     const base = q
-      ? baseWithCategory.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q))
-      : baseWithCategory
+      ? baseWithCoverage.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q))
+      : baseWithCoverage
 
     return base.sort((a, b) => {
       const codeA = a?.siges_code || ''
@@ -196,7 +215,7 @@ export default function OrderRequestView({
 
       return String(codeA).localeCompare(String(codeB), 'es', { numeric: true, sensitivity: 'base' })
     })
-  }, [categoryFilter, computed.rows, hideZeroOrder, search])
+  }, [categoryFilter, computed.rows, coverageDaysLimit, hideZeroOrder, search])
 
   const totalItems = filtered.length
   const safePageSize = Math.max(1, Number(pageSize) || 50)
@@ -218,12 +237,25 @@ export default function OrderRequestView({
     return ['Todas', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'es')), 'Sin categoría']
   }, [medicationCategories])
 
+  const coverageOptions = useMemo(
+    () => [
+      { value: 0, label: 'Cobertura: todas' },
+      { value: 15, label: 'Cobertura: ≤ 15 días' },
+      { value: 30, label: 'Cobertura: ≤ 30 días' },
+      { value: 45, label: 'Cobertura: ≤ 45 días' },
+      { value: 60, label: 'Cobertura: ≤ 60 días' },
+      { value: 90, label: 'Cobertura: ≤ 90 días' },
+    ],
+    [],
+  )
+
   const exportFilteredToPdf = () => {
     const now = new Date()
     const printedAt = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
     const title = 'Solicitud Pedido (filtrado)'
     const monthsUsed = monthLabels.length ? monthLabels.slice().reverse().join(', ') : 'Sin datos'
     const categoryLabel = categoryFilter || 'Todas'
+    const coverageLabel = coverageDaysLimit > 0 ? `<= ${coverageDaysLimit} dias` : 'Todas'
 
     const escapeHtml = (value) =>
       String(value ?? '')
@@ -235,7 +267,7 @@ export default function OrderRequestView({
     const rowsHtml = filtered
       .map((r) => {
         const code = escapeHtml(r.siges_code)
-        const name = escapeHtml(r.medication_name)
+        const name = escapeHtml(truncateText(r.medication_name, 50))
         const consumo = escapeHtml(formatNumber(r.consumoTotal))
         const invTotal = escapeHtml(formatNumber(r.invTotal))
         const empaque = r.empaqueTerciario ? escapeHtml(formatNumber(r.empaqueTerciario)) : '—'
@@ -273,7 +305,7 @@ export default function OrderRequestView({
   </head>
   <body>
     <h1>${escapeHtml(title)}</h1>
-    <div class="meta">Generado: ${escapeHtml(printedAt)} · Meses usados: ${escapeHtml(monthsUsed)} · Meses a pedir: ${escapeHtml(monthsToRequest)} · Categoría: ${escapeHtml(categoryLabel)} · Filas: ${escapeHtml(filtered.length)}</div>
+    <div class="meta">Generado: ${escapeHtml(printedAt)} · Meses usados: ${escapeHtml(monthsUsed)} · Meses a pedir: ${escapeHtml(monthsToRequest)} · Categoría: ${escapeHtml(categoryLabel)} · Cobertura: ${escapeHtml(coverageLabel)} · Filas: ${escapeHtml(filtered.length)}</div>
     <table>
       <thead>
         <tr>
@@ -380,6 +412,21 @@ export default function OrderRequestView({
                   </option>
                 ))}
               </select>
+              <select
+                value={coverageDaysLimit}
+                onChange={(e) => {
+                  setCoverageDaysLimit(Number(e.target.value) || 0)
+                  setPage(1)
+                }}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                title="Filtrar por cobertura (días)"
+              >
+                {coverageOptions.map((opt) => (
+                  <option key={opt.value} value={opt.value}>
+                    {opt.label}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => {
@@ -441,7 +488,12 @@ export default function OrderRequestView({
               {paginated.map((r, idx) => (
                 <tr key={`${r.siges_code || r.medication_name}-${idx}`} className="hover:bg-slate-50">
                   <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap text-center">{r.siges_code || ''}</td>
-                  <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">{r.medication_name}</td>
+                  <td
+                    className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words"
+                    title={r.medication_name}
+                  >
+                    {truncateText(r.medication_name, 50)}
+                  </td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.consumoTotal)}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.invTotal)}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">
