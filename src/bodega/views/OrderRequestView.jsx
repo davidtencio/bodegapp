@@ -117,6 +117,7 @@ export default function OrderRequestView({
       const avg = mean(values)
       const sd = stdDev(values)
       const consumoTotal = avg + sd
+
       const code = String(m.siges_code ?? '').trim()
       const inventory = inventoryByCode.get(code) ?? { inv771: 0, inv772: 0 }
       const invTotal = toNumber(inventory.inv771) + toNumber(inventory.inv772)
@@ -126,12 +127,7 @@ export default function OrderRequestView({
       return {
         siges_code: code,
         medication_name: m.medication_name,
-        perMonth: values,
-        avg,
-        sd,
         consumoTotal,
-        inv771: inventory.inv771,
-        inv772: inventory.inv772,
         invTotal,
         pedido,
       }
@@ -146,9 +142,7 @@ export default function OrderRequestView({
     const q = search.trim().toLowerCase()
     const baseRows = computed.rows ?? []
     const basePre = hideZeroOrder ? baseRows.filter((r) => toNumber(r.pedido) > 0) : baseRows
-    const base = q
-      ? basePre.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q))
-      : basePre
+    const base = q ? basePre.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q)) : basePre
 
     return base.sort((a, b) => {
       const codeA = a?.siges_code || ''
@@ -184,8 +178,8 @@ export default function OrderRequestView({
           <div className="space-y-1">
             <h3 className="font-semibold text-slate-800">Solicitud Pedido</h3>
             <p className="text-xs text-slate-500">
-              Pedido = (Consumo Total × Meses) − (Inventario 772 + Inventario 771). Consumo Total = Promedio + Desv.
-              Est.
+              Pedido = (Consumo total × Meses) − (Inventario total). Consumo total = Promedio + Desv. Est. Inventario total =
+              Inv. 772 + Inv. 771.
             </p>
           </div>
 
@@ -269,43 +263,23 @@ export default function OrderRequestView({
         </div>
 
         <div className="overflow-x-auto">
-          <table className="w-full min-w-[1400px] text-left">
+          <table className="w-full min-w-[860px] text-left">
             <thead className="sticky top-0 z-10 bg-slate-50 text-slate-500 text-[10px] uppercase font-bold shadow-sm">
               <tr>
                 <th className="px-4 py-4 whitespace-nowrap w-36 text-center">Código</th>
-                <th className="px-4 py-4 whitespace-nowrap text-center">Medicamento</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[2] ?? 'Mes 3'}</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[1] ?? 'Mes 2'}</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-32">{monthLabels[0] ?? 'Mes 1'}</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Promedio</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Desv. Est.</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-32">Consumo Total</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Inv. 772</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Inv. 771</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Inv. Total</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Meses</th>
-                <th className="px-3 py-4 text-center whitespace-nowrap w-28">Pedido</th>
+                <th className="px-4 py-4 whitespace-nowrap">Medicamento</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap w-40">Consumo total</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap w-40">Inventario total</th>
+                <th className="px-3 py-4 text-center whitespace-nowrap w-40">Pedido</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginated.map((r, idx) => (
                 <tr key={`${r.siges_code || r.medication_name}-${idx}`} className="hover:bg-slate-50">
-                  <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap text-center">
-                    {r.siges_code || ''}
-                  </td>
-                  <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">
-                    {r.medication_name}
-                  </td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[2] ?? 0)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[1] ?? 0)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.perMonth[0] ?? 0)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.avg)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.sd)}</td>
+                  <td className="px-4 py-4 text-xs text-slate-600 font-mono whitespace-nowrap text-center">{r.siges_code || ''}</td>
+                  <td className="px-4 py-4 text-sm font-medium text-slate-700 whitespace-normal break-words">{r.medication_name}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.consumoTotal)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.inv772)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.inv771)}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{formatNumber(r.invTotal)}</td>
-                  <td className="px-3 py-4 text-center font-mono text-sm tabular-nums">{monthsToRequest}</td>
                   <td className="px-3 py-4 text-center font-mono text-sm font-bold text-blue-700 tabular-nums">
                     {formatNumber(r.pedido)}
                   </td>
@@ -313,7 +287,7 @@ export default function OrderRequestView({
               ))}
               {paginated.length === 0 && (
                 <tr>
-                  <td colSpan={13} className="px-6 py-10 text-center text-sm text-slate-400">
+                  <td colSpan={5} className="px-6 py-10 text-center text-sm text-slate-400">
                     No hay resultados.
                   </td>
                 </tr>
@@ -323,9 +297,7 @@ export default function OrderRequestView({
         </div>
 
         <div className="p-4 border-t border-slate-100 bg-slate-50 flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-          <div className="text-xs text-slate-500">
-            {totalItems === 0 ? '0 resultados' : `Mostrando ${start}-${end} de ${totalItems}`}
-          </div>
+          <div className="text-xs text-slate-500">{totalItems === 0 ? '0 resultados' : `Mostrando ${start}-${end} de ${totalItems}`}</div>
 
           <div className="flex flex-wrap items-center gap-2">
             <label className="text-xs text-slate-500">Filas</label>
@@ -352,9 +324,7 @@ export default function OrderRequestView({
             >
               Anterior
             </button>
-            <span className="text-xs text-slate-600">
-              Página {safePage} de {totalPages}
-            </span>
+            <span className="text-xs text-slate-600">Página {safePage} de {totalPages}</span>
             <button
               type="button"
               onClick={() => setPage((p) => Math.min(totalPages, p + 1))}
@@ -369,3 +339,4 @@ export default function OrderRequestView({
     </div>
   )
 }
+
