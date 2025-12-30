@@ -24,7 +24,7 @@ export default function InventoryView({
 
   const formatInventoryValue = (value) => {
     const asNumber = Number(value)
-    if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { maximumFractionDigits: 2 })
+    if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return String(value ?? '0')
   }
 
@@ -172,7 +172,7 @@ export default function InventoryView({
                   {item.siges_code || ''}
                 </td>
                 <td className="px-6 py-4 max-w-[620px] text-slate-700">
-                  <span className="block truncate font-medium">{item.name}</span>
+                  <span className="block truncate">{item.name}</span>
                 </td>
                 {is771 && (
                   <td className="px-6 py-4 text-slate-600 font-mono">
