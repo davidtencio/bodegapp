@@ -8,6 +8,12 @@ export default function DashboardView({
   onViewAllConsumptions,
   onEditMedication,
 }) {
+  const formatNumber = (value) => {
+    const asNumber = Number(value)
+    if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return String(value ?? '0')
+  }
+
   return (
     <div className="space-y-8">
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
@@ -67,7 +73,7 @@ export default function DashboardView({
                   <div>
                     <p className="font-semibold text-sm text-slate-800">{item.name}</p>
                     <p className="text-xs text-slate-500">
-                      Mínimo: {item.min_stock} | Actual: {item.stock}
+                      Mínimo: {formatNumber(item.computed_min_stock ?? item.min_stock)} | Actual: {formatNumber(item.stock)}
                     </p>
                   </div>
                   <button

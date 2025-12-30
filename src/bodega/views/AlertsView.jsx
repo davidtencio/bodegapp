@@ -1,6 +1,12 @@
 import { AlertTriangle, Package } from 'lucide-react'
 
 export default function AlertsView({ lowStockItems, onEditMedication }) {
+  const formatNumber = (value) => {
+    const asNumber = Number(value)
+    if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
+    return String(value ?? '0')
+  }
+
   return (
     <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
       {lowStockItems.map((item) => (
@@ -20,11 +26,12 @@ export default function AlertsView({ lowStockItems, onEditMedication }) {
                 <span>Categoría:</span> <span className="font-semibold">{item.category}</span>
               </p>
               <p className="flex justify-between">
-                <span>Stock Mínimo:</span> <span className="font-semibold">{item.min_stock}</span>
+                <span>Stock Mínimo:</span>{' '}
+                <span className="font-semibold">{formatNumber(item.computed_min_stock ?? item.min_stock)}</span>
               </p>
               <p className="flex justify-between">
                 <span>Stock Actual:</span>{' '}
-                <span className="font-bold text-red-600 text-base">{item.stock}</span>
+                <span className="font-bold text-red-600 text-base">{formatNumber(item.stock)}</span>
               </p>
             </div>
           </div>
@@ -51,4 +58,3 @@ export default function AlertsView({ lowStockItems, onEditMedication }) {
     </div>
   )
 }
-

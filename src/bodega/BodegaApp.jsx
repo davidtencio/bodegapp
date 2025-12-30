@@ -26,7 +26,46 @@ import { store } from './data/store.js'
 import { dataProvider, isSupabaseConfigured, supabaseProjectRef } from '../lib/supabaseClient.js'
 import * as XLSX from 'xlsx'
 
+function parseNumberLoose(value) {
+  const raw = String(value ?? '').trim()
+  if (!raw) return 0
+  const compact = raw.replace(/\s/g, '')
+  const hasComma = compact.includes(',')
+  const hasDot = compact.includes('.')
+
+  let normalized = compact
+  if (hasComma && hasDot) {
+    normalized = compact.replace(/,/g, '')
+  } else if (hasComma && !hasDot) {
+    normalized = compact.replace(/,/g, '.')
+  }
+
+  const num = Number.parseFloat(normalized)
+  return Number.isFinite(num) ? num : 0
+}
+
+function daysBetween(from, to) {
+  if (!from || !to) return null
+  const ms = to.getTime() - from.getTime()
+  return Math.ceil(ms / (24 * 60 * 60 * 1000))
+}
+
+function getNextScheduledReceiptDate(entries, todayKey) {
+  const today = new Date(`${todayKey}T00:00:00`)
+  const best = (entries ?? [])
+    .map((e) => {
+      const raw = e?.scheduled_receipt_date ? String(e.scheduled_receipt_date) : ''
+      const d = raw ? new Date(`${raw.slice(0, 10)}T00:00:00`) : null
+      return d && Number.isFinite(d.getTime()) ? d : null
+    })
+    .filter(Boolean)
+    .filter((d) => d.getTime() >= today.getTime())
+    .sort((a, b) => a.getTime() - b.getTime())[0]
+  return best ?? null
+}
+
 export default function BodegaApp() {
+  const [todayKey, setTodayKey] = useState(() => new Date().toISOString().slice(0, 10))
   const [activeTab, setActiveTab] = useState('dashboard')
   const [isSidebarOpen, setSidebarOpen] = useState(true)
 
@@ -220,28 +259,102 @@ export default function BodegaApp() {
     return raw.replace(/\s+/g, ' ')
   }
 
-  const parseNumberLoose = (value) => {
-    const raw = String(value ?? '').trim()
-    if (!raw) return 0
-    const compact = raw.replace(/\s/g, '')
-    const hasComma = compact.includes(',')
-    const hasDot = compact.includes('.')
+  useEffect(() => {
+    const now = new Date()
+    const nextMidnight = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1, 0, 0, 0, 50)
+    const ms = Math.max(1000, nextMidnight.getTime() - now.getTime())
+    const t = window.setTimeout(() => setTodayKey(new Date().toISOString().slice(0, 10)), ms)
+    return () => window.clearTimeout(t)
+  }, [todayKey])
 
-    let normalized = compact
-    if (hasComma && hasDot) {
-      normalized = compact.replace(/,/g, '')
-    } else if (hasComma && !hasDot) {
-      normalized = compact.replace(/,/g, '.')
+  const nextReceiptDate = useMemo(
+    () => getNextScheduledReceiptDate(orderCalendar, todayKey),
+    [orderCalendar, todayKey],
+  )
+
+  const avgMonthlyConsumptionByCode = useMemo(() => {
+    const recentMonths = (monthlyBatches ?? []).filter((b) => (b?.items ?? []).length > 0).slice(0, 3)
+    const byCode = new Map()
+
+    for (const batch of recentMonths) {
+      const totals = new Map()
+      for (const item of batch?.items ?? []) {
+        const code = String(item?.siges_code || '').trim()
+        if (!code) continue
+        totals.set(code, (totals.get(code) || 0) + parseNumberLoose(item?.quantity))
+      }
+      for (const [code, qty] of totals.entries()) {
+        const arr = byCode.get(code) || []
+        arr.push(qty)
+        byCode.set(code, arr)
+      }
     }
 
-    const num = Number.parseFloat(normalized)
-    return Number.isFinite(num) ? num : 0
-  }
+    for (const [code, arr] of byCode.entries()) {
+      while (arr.length < 3) arr.push(0)
+      const avg = (arr[0] + arr[1] + arr[2]) / 3
+      byCode.set(code, avg)
+    }
 
-  const lowStockItems = useMemo(
-    () => medications.filter((m) => m.stock <= m.min_stock),
-    [medications],
-  )
+    return byCode
+  }, [monthlyBatches])
+
+  const lowStockItems = useMemo(() => {
+    const today = new Date(`${todayKey}T00:00:00`)
+    const daysToReceipt = nextReceiptDate ? daysBetween(today, nextReceiptDate) : null
+    const daysFactor = Math.max(0, Number(daysToReceipt) || 0) + 4
+
+    const byCode = new Map()
+    for (const m of medications ?? []) {
+      const code = String(m?.siges_code || '').trim()
+      if (!code) continue
+      const existing = byCode.get(code)
+      const stock = Number(m?.stock) || 0
+      const minStockBase = Number(m?.min_stock) || 0
+      const name = String(m?.name || '').trim()
+      const preferred =
+        !existing ||
+        (String(existing?.inventory_type || '772') !== '772' && String(m?.inventory_type || '772') === '772')
+
+      if (!existing) {
+        byCode.set(code, { ...m, siges_code: code, name, stock, min_stock: minStockBase, _sumStock: stock })
+      } else {
+        byCode.set(code, {
+          ...(preferred ? { ...existing, ...m } : existing),
+          siges_code: code,
+          name: preferred ? name || existing.name : existing.name,
+          min_stock: Math.max(existing.min_stock || 0, minStockBase),
+          _sumStock: (existing._sumStock || 0) + stock,
+        })
+      }
+    }
+
+    const results = []
+    for (const entry of byCode.values()) {
+      const code = String(entry.siges_code || '').trim()
+      const stockTotal = Number(entry._sumStock) || 0
+      const avgMonthly = avgMonthlyConsumptionByCode.get(code) || 0
+      const avgDaily = avgMonthly / 30
+      const baseMin = Number(entry.min_stock) || 0
+      const computedMin = nextReceiptDate ? avgDaily * daysFactor : baseMin
+      const minToUse = Number.isFinite(computedMin) ? computedMin : baseMin
+
+      if (stockTotal <= minToUse) {
+        results.push({
+          ...entry,
+          stock: stockTotal,
+          computed_min_stock: minToUse,
+          _daysToReceipt: daysToReceipt,
+        })
+      }
+    }
+
+    results.sort(
+      (a, b) =>
+        (Number(b.computed_min_stock) || 0) - (Number(b.stock) || 0) - ((Number(a.computed_min_stock) || 0) - (Number(a.stock) || 0)),
+    )
+    return results
+  }, [avgMonthlyConsumptionByCode, medications, nextReceiptDate, todayKey])
 
   const stats = useMemo(
     () => ({
