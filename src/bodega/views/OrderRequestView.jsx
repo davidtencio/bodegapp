@@ -1,6 +1,6 @@
 import React, { useMemo, useState } from 'react'
 
-import { ClipboardList, RefreshCcw } from 'lucide-react'
+import { ClipboardList, Download, RefreshCcw } from 'lucide-react'
 
 function toNumber(value) {
   const asNumber =
@@ -63,6 +63,7 @@ export default function OrderRequestView({
   medications,
   months,
   tertiaryPackaging,
+  medicationCategories,
   inventoryStatus,
   monthlyStatus,
   onRefreshInventories,
@@ -71,12 +72,22 @@ export default function OrderRequestView({
   const [monthsToRequest, setMonthsToRequest] = useState(3)
   const [search, setSearch] = useState('')
   const [hideZeroOrder, setHideZeroOrder] = useState(true)
+  const [categoryFilter, setCategoryFilter] = useState('Todas')
   const [pageSize, setPageSize] = useState(50)
   const [page, setPage] = useState(1)
 
   const computed = useMemo(() => {
     const lastThree = (months ?? []).slice(0, 3)
     const monthLabels = lastThree.map((m) => String(m?.label ?? '').trim()).filter(Boolean)
+
+    const categoryByCode = new Map()
+    for (const row of medicationCategories ?? []) {
+      const code = String(row?.siges_code ?? '').trim()
+      if (!code) continue
+      const category = String(row?.category ?? '').trim()
+      if (!category) continue
+      categoryByCode.set(code, category)
+    }
 
     const tertiaryByCode = new Map()
     for (const row of tertiaryPackaging ?? []) {
@@ -139,6 +150,7 @@ export default function OrderRequestView({
             ? 0
             : Math.ceil(pedidoBase / empaqueTerciario) * empaqueTerciario
           : pedidoBase
+      const category = categoryByCode.get(code) ?? ''
 
       return {
         siges_code: code,
@@ -147,11 +159,12 @@ export default function OrderRequestView({
         invTotal,
         empaqueTerciario,
         pedido,
+        category,
       }
     })
 
     return { monthLabels, rows }
-  }, [medications, months, monthsToRequest, tertiaryPackaging])
+  }, [medicationCategories, medications, months, monthsToRequest, tertiaryPackaging])
 
   const monthLabels = computed.monthLabels ?? []
 
@@ -159,7 +172,15 @@ export default function OrderRequestView({
     const q = search.trim().toLowerCase()
     const baseRows = computed.rows ?? []
     const basePre = hideZeroOrder ? baseRows.filter((r) => toNumber(r.pedido) > 0) : baseRows
-    const base = q ? basePre.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q)) : basePre
+    const baseWithCategory =
+      categoryFilter === 'Todas'
+        ? basePre
+        : categoryFilter === 'Sin categoría'
+          ? basePre.filter((r) => !String(r.category || '').trim())
+          : basePre.filter((r) => String(r.category || '').trim() === categoryFilter)
+    const base = q
+      ? baseWithCategory.filter((r) => `${r.siges_code} ${r.medication_name}`.toLowerCase().includes(q))
+      : baseWithCategory
 
     return base.sort((a, b) => {
       const codeA = a?.siges_code || ''
@@ -175,7 +196,7 @@ export default function OrderRequestView({
 
       return String(codeA).localeCompare(String(codeB), 'es', { numeric: true, sensitivity: 'base' })
     })
-  }, [computed.rows, hideZeroOrder, search])
+  }, [categoryFilter, computed.rows, hideZeroOrder, search])
 
   const totalItems = filtered.length
   const safePageSize = Math.max(1, Number(pageSize) || 50)
@@ -187,6 +208,95 @@ export default function OrderRequestView({
     const startIndex = (safePage - 1) * safePageSize
     return filtered.slice(startIndex, startIndex + safePageSize)
   }, [filtered, safePage, safePageSize])
+
+  const categoryOptions = useMemo(() => {
+    const set = new Set()
+    for (const row of medicationCategories ?? []) {
+      const category = String(row?.category ?? '').trim()
+      if (category) set.add(category)
+    }
+    return ['Todas', ...Array.from(set).sort((a, b) => a.localeCompare(b, 'es')), 'Sin categoría']
+  }, [medicationCategories])
+
+  const exportFilteredToPdf = () => {
+    const now = new Date()
+    const printedAt = `${String(now.getDate()).padStart(2, '0')}/${String(now.getMonth() + 1).padStart(2, '0')}/${now.getFullYear()}`
+    const title = 'Solicitud Pedido (filtrado)'
+    const monthsUsed = monthLabels.length ? monthLabels.slice().reverse().join(', ') : 'Sin datos'
+    const categoryLabel = categoryFilter || 'Todas'
+
+    const escapeHtml = (value) =>
+      String(value ?? '')
+        .replaceAll('&', '&amp;')
+        .replaceAll('<', '&lt;')
+        .replaceAll('>', '&gt;')
+        .replaceAll('"', '&quot;')
+
+    const rowsHtml = filtered
+      .map((r) => {
+        const code = escapeHtml(r.siges_code)
+        const name = escapeHtml(r.medication_name)
+        const consumo = escapeHtml(formatNumber(r.consumoTotal))
+        const invTotal = escapeHtml(formatNumber(r.invTotal))
+        const empaque = r.empaqueTerciario ? escapeHtml(formatNumber(r.empaqueTerciario)) : '—'
+        const pedido = escapeHtml(formatNumber(r.pedido))
+
+        return `<tr>
+          <td class="mono center">${code}</td>
+          <td>${name}</td>
+          <td class="mono right">${consumo}</td>
+          <td class="mono right">${invTotal}</td>
+          <td class="mono right">${empaque}</td>
+          <td class="mono right strong">${pedido}</td>
+        </tr>`
+      })
+      .join('')
+
+    const html = `<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <title>${escapeHtml(title)}</title>
+    <style>
+      @page { size: A4 landscape; margin: 12mm; }
+      body { font-family: system-ui, -apple-system, Segoe UI, Roboto, Arial, sans-serif; color: #0f172a; }
+      h1 { font-size: 16px; margin: 0 0 4px; }
+      .meta { font-size: 12px; color: #475569; margin-bottom: 10px; }
+      table { width: 100%; border-collapse: collapse; font-size: 11px; }
+      th, td { border: 1px solid #e2e8f0; padding: 6px 8px; vertical-align: top; }
+      th { background: #f8fafc; text-transform: uppercase; font-size: 10px; letter-spacing: .04em; }
+      .mono { font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, 'Liberation Mono', 'Courier New', monospace; }
+      .center { text-align: center; }
+      .right { text-align: right; }
+      .strong { font-weight: 700; color: #1d4ed8; }
+    </style>
+  </head>
+  <body>
+    <h1>${escapeHtml(title)}</h1>
+    <div class="meta">Generado: ${escapeHtml(printedAt)} · Meses usados: ${escapeHtml(monthsUsed)} · Meses a pedir: ${escapeHtml(monthsToRequest)} · Categoría: ${escapeHtml(categoryLabel)} · Filas: ${escapeHtml(filtered.length)}</div>
+    <table>
+      <thead>
+        <tr>
+          <th>Código</th>
+          <th>Medicamento</th>
+          <th>Consumo total</th>
+          <th>Inventario total</th>
+          <th>Empaque terciario</th>
+          <th>Pedido</th>
+        </tr>
+      </thead>
+      <tbody>${rowsHtml || ''}</tbody>
+    </table>
+    <script>window.onload = () => { window.focus(); window.print(); };</script>
+  </body>
+</html>`
+
+    const win = window.open('', '_blank', 'noopener,noreferrer')
+    if (!win) return
+    win.document.open()
+    win.document.write(html)
+    win.document.close()
+  }
 
   return (
     <div className="space-y-6">
@@ -212,6 +322,15 @@ export default function OrderRequestView({
               <RefreshCcw size={16} />
               Sincronizar
             </button>
+            <button
+              type="button"
+              onClick={exportFilteredToPdf}
+              className="px-3 py-2 rounded-lg border border-slate-200 text-slate-700 hover:bg-slate-50 text-sm flex items-center gap-2"
+              title="Exporta lo filtrado usando la impresora del navegador (Guardar como PDF)."
+            >
+              <Download size={16} />
+              Exportar PDF
+            </button>
           </div>
         </div>
 
@@ -234,6 +353,21 @@ export default function OrderRequestView({
           <div className="md:col-span-2 flex flex-col gap-2">
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Filtros</label>
             <div className="flex flex-wrap items-center gap-2">
+              <select
+                value={categoryFilter}
+                onChange={(e) => {
+                  setCategoryFilter(e.target.value)
+                  setPage(1)
+                }}
+                className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
+                title="Filtrar por categoría"
+              >
+                {categoryOptions.map((opt) => (
+                  <option key={opt} value={opt}>
+                    {opt}
+                  </option>
+                ))}
+              </select>
               <button
                 type="button"
                 onClick={() => {

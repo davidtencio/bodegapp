@@ -1706,6 +1706,7 @@ export default function BodegaApp() {
             medications={medications}
             months={monthlyBatches}
             tertiaryPackaging={tertiaryPackaging}
+            medicationCategories={medicationCategories}
             inventoryStatus={inventoryStatus}
             monthlyStatus={monthlyStatus}
             onRefreshInventories={refreshInventories}
