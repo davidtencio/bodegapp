@@ -14,6 +14,9 @@ export default function InventoryView({
   hideNoMovement,
   canToggleHideNoMovement,
   onToggleHideNoMovement,
+  hideNoMovement4m,
+  canToggleHideNoMovement4m,
+  onToggleHideNoMovement4m,
   search,
   onSearchChange,
   items,
@@ -102,6 +105,22 @@ export default function InventoryView({
               <RefreshCcw size={14} />
               Sincronizar
             </button>
+            {!isTotal && (
+              <button
+                type="button"
+                onClick={() => onToggleHideNoMovement4m?.()}
+                disabled={!canToggleHideNoMovement4m}
+                className="px-3 py-2 rounded-lg text-xs font-bold bg-white border border-slate-200 text-slate-600 hover:bg-slate-100 flex items-center gap-2 disabled:opacity-40 disabled:hover:bg-white"
+                title={
+                  canToggleHideNoMovement4m
+                    ? 'Oculta medicamentos sin consumo en los últimos 4 meses.'
+                    : 'No hay consumos cargados para filtrar.'
+                }
+              >
+                {hideNoMovement4m ? <Eye size={14} /> : <EyeOff size={14} />}
+                {hideNoMovement4m ? 'Mostrar sin movimiento' : 'Ocultar sin movimiento (4 meses)'}
+              </button>
+            )}
             {isTotal && (
               <button
                 type="button"

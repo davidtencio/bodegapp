@@ -82,6 +82,7 @@ export default function BodegaApp() {
   const [medications, setMedications] = useState([])
   const [inventorySearch, setInventorySearch] = useState('')
   const [inventoryType, setInventoryType] = useState('772')
+  const [hideInventoryNoMovement4m, setHideInventoryNoMovement4m] = useState(false)
   const [hideInventoryTotalNoMovement, setHideInventoryTotalNoMovement] = useState(false)
   const [inventoryPageSize, setInventoryPageSize] = useState(50)
   const [inventoryPageByType, setInventoryPageByType] = useState({ '771': 1, '772': 1 })
@@ -417,12 +418,33 @@ export default function BodegaApp() {
   const filteredInventory = useMemo(() => {
     const selectedType = String(inventoryType || '772')
     const query = inventorySearch.trim().toLowerCase()
+    const hasAnyMonthlyData = (monthlyBatches ?? []).some((b) => (b?.items ?? []).length > 0)
 
     const normalizeMergeKey = ({ siges_code, name }) => {
       const code = String(siges_code || '').trim()
       if (code) return `code:${code.toLowerCase()}`
       const n = String(name || '').trim().toLowerCase()
       return n ? `name:${n}` : ''
+    }
+
+    const getSigesCodeSortParts = (value) => {
+      const raw = String(value ?? '').trim()
+      const digits = raw.replace(/\D/g, '')
+      const prefix = digits.slice(0, 3)
+      const rank = prefix === '110' ? 0 : prefix === '111' ? 2 : 1
+      const last4 = digits.length >= 4 ? digits.slice(-4) : digits
+      const last4Num = last4 ? Number.parseInt(last4, 10) : Number.POSITIVE_INFINITY
+      return { rank, last4Num: Number.isFinite(last4Num) ? last4Num : Number.POSITIVE_INFINITY, raw }
+    }
+
+    const compareInventoryRows = (a, b) => {
+      const aParts = getSigesCodeSortParts(a?.siges_code)
+      const bParts = getSigesCodeSortParts(b?.siges_code)
+      if (aParts.rank !== bParts.rank) return aParts.rank - bParts.rank
+      if (aParts.last4Num !== bParts.last4Num) return aParts.last4Num - bParts.last4Num
+      const codeCmp = String(aParts.raw || '').localeCompare(String(bParts.raw || ''), 'es', { numeric: true, sensitivity: 'base' })
+      if (codeCmp !== 0) return codeCmp
+      return String(a?.name || '').localeCompare(String(b?.name || ''), 'es', { numeric: true, sensitivity: 'base' })
     }
 
     const sortLots = (lots) => {
@@ -472,12 +494,25 @@ export default function BodegaApp() {
     if (selectedType === '771') {
       const base771 = medications.filter((m) => String(m.inventory_type || '772') === '771')
       const grouped771 = group771(base771)
-      if (!query) return grouped771
-      return grouped771.filter((row) => {
-        const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
-        const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
-        return haystack.includes(query)
-      })
+      const filteredForMovement =
+        hideInventoryNoMovement4m && hasAnyMonthlyData
+          ? grouped771.filter((row) => {
+              const code = String(row?.siges_code || '').trim()
+              if (!code) return true
+              return (movementByCodeLast4Months.get(code) || 0) > 0
+            })
+          : grouped771
+
+      const filtered = query
+        ? filteredForMovement.filter((row) => {
+            const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
+            const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
+            return haystack.includes(query)
+          })
+        : filteredForMovement
+
+      filtered.sort(compareInventoryRows)
+      return filtered
     }
 
     if (selectedType === 'total') {
@@ -550,7 +585,6 @@ export default function BodegaApp() {
         return entry
       })
 
-      const hasAnyMonthlyData = (monthlyBatches ?? []).some((b) => (b?.items ?? []).length > 0)
       const filteredForMovement = hideInventoryTotalNoMovement && hasAnyMonthlyData
         ? merged.filter((row) => {
             const code = String(row.siges_code || '').trim()
@@ -568,12 +602,33 @@ export default function BodegaApp() {
     }
 
     const base = medications.filter((m) => String(m.inventory_type || '772') === selectedType)
-    if (!query) return base
-    return base.filter((m) => {
-      const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
-      return haystack.includes(query)
-    })
-  }, [hideInventoryTotalNoMovement, inventorySearch, medications, inventoryType, monthlyBatches])
+    const filteredForMovement =
+      hideInventoryNoMovement4m && hasAnyMonthlyData
+        ? base.filter((m) => {
+            const code = String(m?.siges_code || '').trim()
+            if (!code) return true
+            return (movementByCodeLast4Months.get(code) || 0) > 0
+          })
+        : base
+
+    const filtered = query
+      ? filteredForMovement.filter((m) => {
+          const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
+          return haystack.includes(query)
+        })
+      : filteredForMovement
+
+    filtered.sort(compareInventoryRows)
+    return filtered
+  }, [
+    hideInventoryNoMovement4m,
+    hideInventoryTotalNoMovement,
+    inventorySearch,
+    medications,
+    inventoryType,
+    monthlyBatches,
+    movementByCodeLast4Months,
+  ])
 
   const inventoryPage = inventoryPageByType?.[String(inventoryType || '772')] ?? 1
 
@@ -1912,6 +1967,12 @@ export default function BodegaApp() {
             onToggleHideNoMovement={() => {
               setHideInventoryTotalNoMovement((prev) => !prev)
               setInventoryPageByType((prev) => ({ ...prev, total: 1 }))
+            }}
+            hideNoMovement4m={hideInventoryNoMovement4m}
+            canToggleHideNoMovement4m={canFilterInventoryTotalNoMovement}
+            onToggleHideNoMovement4m={() => {
+              setHideInventoryNoMovement4m((prev) => !prev)
+              setInventoryPageByType((prev) => ({ ...prev, [String(inventoryType || '772')]: 1 }))
             }}
             search={inventorySearch}
             onSearchChange={(value) => {
