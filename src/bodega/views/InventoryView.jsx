@@ -65,7 +65,10 @@ export default function InventoryView({
 
   const hasLotDetails = (lot) => {
     if (!lot) return false
-    return Boolean(String(lot.batch || '').trim() || String(lot.expiry_date || '').trim())
+    const batch = String(lot.batch || '').trim()
+    const hasBatch = batch && batch.toUpperCase() !== 'S/N'
+    const hasExpiry = Boolean(String(lot.expiry_date || '').trim())
+    return hasBatch || hasExpiry
   }
 
   const total = Number(totalItems) || 0
