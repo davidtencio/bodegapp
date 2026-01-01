@@ -1111,9 +1111,9 @@ export default function BodegaApp() {
     const newMed = {
       id: editingMed ? editingMed.id : globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now(),
       inventory_type: editingMed?.inventory_type ?? String(inventoryType || '772'),
-      siges_code: editingMed?.siges_code ?? '',
-      sicop_classifier: editingMed?.sicop_classifier ?? '',
-      sicop_identifier: editingMed?.sicop_identifier ?? '',
+      siges_code: String(formData.get('siges_code') ?? editingMed?.siges_code ?? '').trim(),
+      sicop_classifier: String(formData.get('sicop_classifier') ?? editingMed?.sicop_classifier ?? '').trim(),
+      sicop_identifier: String(formData.get('sicop_identifier') ?? editingMed?.sicop_identifier ?? '').trim(),
       name: String(formData.get('name') || '').trim(),
       category: String(formData.get('category') || '').trim(),
       batch: String(formData.get('batch') || '').trim(),

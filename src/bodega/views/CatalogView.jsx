@@ -43,6 +43,13 @@ export default function CatalogView({
     })
   }, [medications])
 
+  const sicopStats = useMemo(() => {
+    const items = medications ?? []
+    const withClassifier = items.filter((m) => String(m?.sicop_classifier || '').trim()).length
+    const withIdentifier = items.filter((m) => String(m?.sicop_identifier || '').trim()).length
+    return { total: items.length, withClassifier, withIdentifier }
+  }, [medications])
+
   return (
     <div className="space-y-6">
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
@@ -128,6 +135,13 @@ export default function CatalogView({
               </button>
             </div>
           </div>
+          {sicopStats.total > 0 && sicopStats.withClassifier === 0 && sicopStats.withIdentifier === 0 && (
+            <div className="mx-4 mt-4 p-3 rounded-lg text-xs bg-amber-50 text-amber-800 border border-amber-100">
+              No se detectaron códigos SICOP en el catálogo. Verifica tu CSV (columnas
+              <span className="font-mono"> ClasificadorSICOP</span> /
+              <span className="font-mono"> IdentificadorSICOP</span>) o edítalos con el lápiz en una fila.
+            </div>
+          )}
           <div className="max-h-[400px] overflow-y-auto">
             <table className="w-full text-left">
               <thead className="sticky top-0 bg-white shadow-sm text-slate-500 text-[10px] uppercase font-bold">

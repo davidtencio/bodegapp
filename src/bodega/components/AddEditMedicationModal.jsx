@@ -17,6 +17,33 @@ export default function AddEditMedicationModal({ editingMed, onClose, onSubmit }
           </button>
         </div>
         <form onSubmit={onSubmit} className="p-6 grid grid-cols-2 gap-4">
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">CÓDIGO SIGES</label>
+            <input
+              name="siges_code"
+              defaultValue={editingMed?.siges_code}
+              className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+              placeholder="110-00-0000"
+            />
+          </div>
+          <div>
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Clasificador SICOP</label>
+            <input
+              name="sicop_classifier"
+              defaultValue={editingMed?.sicop_classifier}
+              className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+              placeholder="CLASIF-SICOP"
+            />
+          </div>
+          <div className="col-span-2">
+            <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">Identificador SICOP</label>
+            <input
+              name="sicop_identifier"
+              defaultValue={editingMed?.sicop_identifier}
+              className="w-full border p-2.5 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none text-sm font-mono"
+              placeholder="ID-SICOP"
+            />
+          </div>
           <div className="col-span-2">
             <label className="block text-[10px] font-bold text-slate-500 uppercase mb-1">
               Nombre Comercial
@@ -108,4 +135,3 @@ export default function AddEditMedicationModal({ editingMed, onClose, onSubmit }
     </div>
   )
 }
-
