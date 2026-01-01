@@ -81,6 +81,10 @@ export default function BodegaApp() {
   const [isSidebarOpen, setSidebarOpen] = useState(true)
 
   const [medications, setMedications] = useState([])
+  const activeMedications = useMemo(
+    () => (medications ?? []).filter((m) => !m?.discontinued_at),
+    [medications],
+  )
   const [inventorySearch, setInventorySearch] = useState('')
   const [inventoryType, setInventoryType] = useState('772')
   const [hideInventoryNoMovement4m, setHideInventoryNoMovement4m] = useState(false)
@@ -333,7 +337,7 @@ export default function BodegaApp() {
     const daysFactor = Math.max(0, Number(daysToReceipt) || 0) + 4
 
     const byCode = new Map()
-    for (const m of medications ?? []) {
+    for (const m of activeMedications ?? []) {
       const code = String(m?.siges_code || '').trim()
       if (!code) continue
       const existing = byCode.get(code)
@@ -405,16 +409,16 @@ export default function BodegaApp() {
         (Number(b.computed_min_stock) || 0) - (Number(b.stock) || 0) - ((Number(a.computed_min_stock) || 0) - (Number(a.stock) || 0)),
     )
     return results
-  }, [avgMonthlyConsumptionByCode, medications, movementByCodeLast4Months, nextReceiptDate, todayKey])
+  }, [activeMedications, avgMonthlyConsumptionByCode, movementByCodeLast4Months, nextReceiptDate, todayKey])
 
   const stats = useMemo(
     () => ({
-      totalItems: medications.length,
+      totalItems: activeMedications.length,
       lowStockCount: lowStockItems.length,
-      totalStockValue: medications.reduce((acc, curr) => acc + curr.stock, 0),
+      totalStockValue: activeMedications.reduce((acc, curr) => acc + curr.stock, 0),
       recentConsumptions: monthlyBatches[0]?.items?.length || 0,
     }),
-    [medications, lowStockItems, monthlyBatches],
+    [activeMedications, lowStockItems, monthlyBatches],
   )
 
   const filteredInventory = useMemo(() => {
@@ -1150,6 +1154,41 @@ export default function BodegaApp() {
       setAppStatus({
         loading: false,
         message: err?.message ? String(err.message) : 'No se pudo eliminar el medicamento.',
+        type: 'error',
+      })
+    }
+  }
+
+  const toggleDiscontinueMedication = async (med) => {
+    const current = med ? { ...med } : null
+    if (!current?.id) return
+
+    const isDiscontinued = Boolean(current?.discontinued_at)
+    const ok = window.confirm(
+      isDiscontinued
+        ? '¿Desea reactivar este medicamento?'
+        : '¿Desea marcar este medicamento como descontinuado? No se eliminará, solo se ocultará por defecto en Catálogo.',
+    )
+    if (!ok) return
+
+    try {
+      setAppStatus({ loading: true, message: isDiscontinued ? 'Reactivando...' : 'Descontinuando...', type: 'info' })
+      const next = {
+        ...current,
+        discontinued_at: isDiscontinued ? null : new Date().toISOString(),
+      }
+      await store.upsertMedication(next)
+      await reloadMedications()
+      setAppStatus({ loading: false, message: '', type: '' })
+    } catch (err) {
+      const raw = err?.message ? String(err.message) : ''
+      const hint =
+        raw.includes('discontinued_at') && dataProvider === 'supabase' && isSupabaseConfigured
+          ? ' En Supabase falta la columna `discontinued_at`. Ejecuta `supabase/schema.sql` y vuelve a intentar.'
+          : ''
+      setAppStatus({
+        loading: false,
+        message: `${raw || 'No se pudo actualizar el medicamento.'}${hint}`,
         type: 'error',
       })
     }
@@ -2005,6 +2044,7 @@ export default function BodegaApp() {
             onFileChange={processCsv}
             onSicopFileChange={processSicopCsv}
             onEditMedication={openEditMedication}
+            onDiscontinueMedication={toggleDiscontinueMedication}
             onDeleteMedication={deleteMedication}
             onClearCatalog={clearCatalog}
           />
@@ -2096,7 +2136,7 @@ export default function BodegaApp() {
 
         {activeTab === 'order-request' && (
           <OrderRequestView
-            medications={medications}
+            medications={activeMedications}
             months={monthlyBatches}
             tertiaryPackaging={tertiaryPackaging}
             medicationCategories={medicationCategories}

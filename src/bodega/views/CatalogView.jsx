@@ -1,5 +1,5 @@
-import { AlertTriangle, CheckCircle2, Download, Edit2, FileSpreadsheet, Trash2, Upload } from 'lucide-react'
-import { useMemo } from 'react'
+import { AlertTriangle, CheckCircle2, Download, Edit2, FileSpreadsheet, Slash, Trash2, Upload } from 'lucide-react'
+import { useMemo, useState } from 'react'
 
 export default function CatalogView({
   medications,
@@ -12,6 +12,7 @@ export default function CatalogView({
   onFileChange,
   onSicopFileChange,
   onEditMedication,
+  onDiscontinueMedication,
   onDeleteMedication,
   onClearCatalog,
 }) {
@@ -52,6 +53,13 @@ export default function CatalogView({
     const withIdentifier = items.filter((m) => String(m?.sicop_identifier || '').trim()).length
     return { total: items.length, withClassifier, withIdentifier }
   }, [medications])
+
+  const [showDiscontinued, setShowDiscontinued] = useState(false)
+  const visibleMedications = useMemo(() => {
+    const base = sortedMedications ?? []
+    if (showDiscontinued) return base
+    return base.filter((m) => !m?.discontinued_at)
+  }, [showDiscontinued, sortedMedications])
 
   return (
     <div className="space-y-6">
@@ -121,6 +129,15 @@ export default function CatalogView({
           <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
             <h3 className="font-bold text-slate-800">Vista Previa del Catálogo</h3>
             <div className="flex items-center gap-3">
+              <label className="flex items-center gap-2 text-xs text-slate-600 font-bold select-none">
+                <input
+                  type="checkbox"
+                  checked={showDiscontinued}
+                  onChange={(e) => setShowDiscontinued(e.target.checked)}
+                  className="accent-blue-600"
+                />
+                Mostrar descontinuados
+              </label>
               <button
                 type="button"
                 onClick={() => {
@@ -173,8 +190,11 @@ export default function CatalogView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {sortedMedications.map((item) => (
-                  <tr key={item.id} className="hover:bg-slate-50 transition-colors group">
+                {visibleMedications.map((item) => (
+                  <tr
+                    key={item.id}
+                    className={`hover:bg-slate-50 transition-colors group ${item.discontinued_at ? 'opacity-60' : ''}`}
+                  >
                     <td className="px-6 py-3 text-sm text-slate-700 font-mono">{item.siges_code || '—'}</td>
                     <td className="px-6 py-3 text-sm text-slate-700 font-mono">{item.sicop_classifier || '—'}</td>
                     <td className="px-6 py-3 text-sm text-slate-700 font-mono">{item.sicop_identifier || '—'}</td>
@@ -182,7 +202,14 @@ export default function CatalogView({
                       className="px-6 py-3 text-sm font-medium text-slate-700"
                       title={formatMedicationName(item.name).full}
                     >
-                      {formatMedicationName(item.name).display}
+                      <div className="flex items-center gap-2 min-w-0">
+                        <span className="truncate">{formatMedicationName(item.name).display}</span>
+                        {item.discontinued_at && (
+                          <span className="text-[10px] font-bold uppercase px-2 py-0.5 rounded-full bg-slate-100 text-slate-600 whitespace-nowrap">
+                            Descontinuado
+                          </span>
+                        )}
+                      </div>
                     </td>
                     <td className="px-6 py-3">
                       <div className="flex justify-center space-x-2 opacity-0 group-hover:opacity-100 transition-opacity">
@@ -194,6 +221,15 @@ export default function CatalogView({
                           title="Editar"
                         >
                           <Edit2 size={14} />
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => onDiscontinueMedication?.(item)}
+                          className="p-1.5 text-slate-400 hover:text-amber-700 hover:bg-amber-50 rounded-lg"
+                          aria-label={item.discontinued_at ? 'Reactivar' : 'Descontinuar'}
+                          title={item.discontinued_at ? 'Reactivar' : 'Descontinuar'}
+                        >
+                          <Slash size={14} />
                         </button>
                         <button
                           type="button"
