@@ -1467,15 +1467,9 @@ export default function BodegaApp() {
     const selectedType = String(type || '772').trim() || '772'
 
     const rows = readCsvAsRows(text)
-    const dataRows = looksLikeInventoryHeaderRow(rows?.[0]) ? rows.slice(1) : rows
-
-    const hasThreeColumns = dataRows.some((row) => {
-      const siges = String(row?.[0] ?? '').trim()
-      const name = String(row?.[1] ?? '').trim()
-      return Boolean(siges && name)
-    })
-
-    const data = hasThreeColumns ? null : readCsvAsJson(text)
+    const hasHeaderRow = looksLikeInventoryHeaderRow(rows?.[0])
+    const dataRows = hasHeaderRow ? rows.slice(1) : rows
+    const data = hasHeaderRow ? readCsvAsJson(text) : null
 
     const current = (await store.getMedications()) ?? []
     const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
@@ -1488,7 +1482,7 @@ export default function BodegaApp() {
     const now = Date.now()
     const importedMeds = (dataRows ?? [])
       .map((row, index) => {
-        if (!hasThreeColumns) return null
+        if (hasHeaderRow) return null
 
         const siges_code = String(row?.[0] ?? '').trim()
         const name = String(row?.[1] ?? '').trim()
@@ -1519,7 +1513,7 @@ export default function BodegaApp() {
 
     const importedFromJson = (data ?? [])
       .map((row, index) => {
-        if (hasThreeColumns) return null
+        if (!hasHeaderRow) return null
 
         const siges_code = String(row.CodigoSIGES || '').trim()
         const name = String(row.Medicamento || row.Nombre || '').trim()
@@ -1539,14 +1533,14 @@ export default function BodegaApp() {
           category: String(row.Categoria || 'General').trim() || 'General',
           batch: String(row.Lote || 'S/N').trim() || 'S/N',
           expiry_date: normalizeDateInput(row.Vencimiento),
-          stock: parseInventoryNumber(row.Stock),
+          stock: parseInventoryNumber(row.Stock ?? row.Inventario ?? row.Existencia ?? row.Saldo),
           min_stock: parseInventoryNumber(row.StockMinimo || 0),
           unit: String(row.Unidad || 'Unidad').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
 
-    const combined = hasThreeColumns ? importedMeds : importedFromJson
+    const combined = hasHeaderRow ? importedFromJson : importedMeds
 
     await store.upsertMedications(combined)
 
