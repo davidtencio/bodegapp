@@ -63,6 +63,11 @@ export default function InventoryView({
     return `${batch} (${expiry}): ${qty}`
   }
 
+  const hasLotDetails = (lot) => {
+    if (!lot) return false
+    return Boolean(String(lot.batch || '').trim() || String(lot.expiry_date || '').trim())
+  }
+
   const total = Number(totalItems) || 0
   const size = Number(pageSize) || 50
   const totalPages = Math.max(1, Math.ceil(total / size))
@@ -233,15 +238,20 @@ export default function InventoryView({
                 {(is771 || isTotal) && (
                   <td className={`px-6 py-4 text-slate-600 font-mono ${isTotal ? 'text-center' : ''}`}>
                     <div className={`flex flex-col gap-1 ${isTotal ? 'items-center' : ''}`}>
-                      {Array.isArray(item.lots) && item.lots.length > 0 ? (
-                        item.lots.map((lot) => (
-                          <div key={lot.id || `${lot.batch}-${lot.expiry_date}`} className="whitespace-nowrap">
-                            {formatLotLine(lot)}
-                          </div>
-                        ))
-                      ) : (
-                        <div className="whitespace-nowrap">{isTotal ? '—' : formatLotLine(item)}</div>
-                      )}
+                      {(() => {
+                        const lots = Array.isArray(item.lots) ? item.lots : []
+                        const showLots = lots.length > 0 && lots.some(hasLotDetails)
+                        if (showLots) {
+                          return lots.map((lot) => (
+                            <div key={lot.id || `${lot.batch}-${lot.expiry_date}`} className="whitespace-nowrap">
+                              {formatLotLine(lot)}
+                            </div>
+                          ))
+                        }
+
+                        const fallbackHasDetails = hasLotDetails(item)
+                        return <div className="whitespace-nowrap">{fallbackHasDetails ? formatLotLine(item) : '—'}</div>
+                      })()}
                     </div>
                   </td>
                 )}
