@@ -2,6 +2,7 @@ import {
   BarChart3,
   CalendarDays,
   ChevronDown,
+  ClipboardCheck,
   ClipboardList,
   FileSpreadsheet,
   Menu,
@@ -54,6 +55,7 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
         label: 'Gestión de inventarios',
         items: [
           { id: 'inventory', icon: Pill, label: 'Inventario' },
+          { id: 'inventory-take', icon: ClipboardCheck, label: 'Toma Inventario' },
           { id: 'catalog', icon: FileSpreadsheet, label: 'Catálogo' },
           { id: 'categories', icon: Tag, label: 'Categorías' },
         ],

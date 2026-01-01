@@ -8,6 +8,7 @@ import CatalogView from './views/CatalogView.jsx'
 import ConsumptionSummaryView from './views/ConsumptionSummaryView.jsx'
 import DashboardView from './views/DashboardView.jsx'
 import InventoryView from './views/InventoryView.jsx'
+import InventoryTakeView from './views/InventoryTakeView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import OrderRequestView from './views/OrderRequestView.jsx'
 import TertiaryPackagingView from './views/TertiaryPackagingView.jsx'
@@ -1993,6 +1994,8 @@ export default function BodegaApp() {
             }}
           />
         )}
+
+        {activeTab === 'inventory-take' && <InventoryTakeView medications={medications} />}
 
         {activeTab === 'consumption-monthly' && (
           <MonthlyConsumptionView

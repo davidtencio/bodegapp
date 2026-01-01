@@ -4,6 +4,8 @@ export default function PageHeader({ activeTab }) {
       ? 'Resumen General'
     : activeTab === 'inventory'
         ? 'Gestión de Inventario'
+    : activeTab === 'inventory-take'
+          ? 'Toma Inventario'
     : activeTab === 'catalog'
           ? 'Catálogo de Productos'
     : activeTab === 'consumption-monthly'
