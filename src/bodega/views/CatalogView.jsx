@@ -5,9 +5,12 @@ export default function CatalogView({
   medications,
   excelStatus,
   fileInputRef,
+  sicopFileInputRef,
   onChooseFile,
+  onChooseSicopFile,
   onDownloadTemplate,
   onFileChange,
+  onSicopFileChange,
   onEditMedication,
   onDeleteMedication,
   onClearCatalog,
@@ -75,6 +78,13 @@ export default function CatalogView({
             accept=".csv"
             className="hidden"
           />
+          <input
+            type="file"
+            ref={sicopFileInputRef}
+            onChange={onSicopFileChange}
+            accept=".csv"
+            className="hidden"
+          />
 
           <button
             type="button"
@@ -132,6 +142,15 @@ export default function CatalogView({
               >
                 <Download size={14} />
                 <span>Descargar Plantilla</span>
+              </button>
+              <button
+                type="button"
+                onClick={onChooseSicopFile}
+                className="text-xs text-slate-600 font-bold flex items-center space-x-1 hover:underline"
+                title="Importa/actualiza sólo códigos SICOP por Código SIGES"
+              >
+                <Upload size={14} />
+                <span>Cargar SICOP</span>
               </button>
             </div>
           </div>

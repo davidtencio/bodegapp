@@ -94,6 +94,7 @@ export default function BodegaApp() {
   const [appStatus, setAppStatus] = useState({ loading: true, message: '', type: '' })
 
   const fileInputRef = useRef(null)
+  const sicopFileInputRef = useRef(null)
   const [excelStatus, setExcelStatus] = useState({ loading: false, message: '', type: '' })
 
   const inventoryFileInputRef = useRef(null)
@@ -1623,6 +1624,72 @@ export default function BodegaApp() {
     e.target.value = null
   }
 
+  const processSicopCsv = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setExcelStatus({ loading: true, message: 'Procesando SICOP...', type: 'info' })
+
+    const reader = new FileReader()
+    reader.onerror = () => {
+      setExcelStatus({ loading: false, message: 'No se pudo leer el archivo.', type: 'error' })
+    }
+    reader.onload = async (evt) => {
+      try {
+        const text = String(evt.target?.result || '')
+        const rows = readCsvAsJson(text)
+
+        const byCode = new Map()
+        for (const row of rows ?? []) {
+          const code = String(row?.CodigoSIGES || '').trim()
+          if (!code) continue
+          const classifier = String(row?.ClasificadorSICOP || '').trim()
+          const identifier = String(row?.IdentificadorSICOP || '').trim()
+          if (!classifier && !identifier) continue
+          byCode.set(code, { classifier, identifier })
+        }
+
+        if (byCode.size === 0) {
+          setExcelStatus({
+            loading: false,
+            message: 'No se encontraron filas con CodigoSIGES y valores SICOP.',
+            type: 'error',
+          })
+          return
+        }
+
+        const current = (await store.getMedications()) ?? []
+        const updated = current.map((m) => {
+          const code = String(m?.siges_code || '').trim()
+          const patch = byCode.get(code)
+          if (!patch) return m
+          return {
+            ...m,
+            sicop_classifier: patch.classifier || String(m?.sicop_classifier || '').trim(),
+            sicop_identifier: patch.identifier || String(m?.sicop_identifier || '').trim(),
+          }
+        })
+
+        await store.upsertMedications(updated)
+        await reloadMedications()
+        setExcelStatus({
+          loading: false,
+          message: `SICOP actualizado para ${byCode.size} códigos SIGES.`,
+          type: 'success',
+        })
+        window.setTimeout(() => setExcelStatus({ loading: false, message: '', type: '' }), 4000)
+      } catch (err) {
+        setExcelStatus({
+          loading: false,
+          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV de SICOP.',
+          type: 'error',
+        })
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = null
+  }
+
   const downloadInventoryTemplate = (type) => {
     const selectedType = String(type || inventoryType || '772')
     if (selectedType === 'total') return
@@ -1931,9 +1998,12 @@ export default function BodegaApp() {
             medications={medications}
             excelStatus={excelStatus}
             fileInputRef={fileInputRef}
+            sicopFileInputRef={sicopFileInputRef}
             onChooseFile={() => fileInputRef.current?.click()}
+            onChooseSicopFile={() => sicopFileInputRef.current?.click()}
             onDownloadTemplate={downloadCatalogTemplateCsv}
             onFileChange={processCsv}
+            onSicopFileChange={processSicopCsv}
             onEditMedication={openEditMedication}
             onDeleteMedication={deleteMedication}
             onClearCatalog={clearCatalog}
