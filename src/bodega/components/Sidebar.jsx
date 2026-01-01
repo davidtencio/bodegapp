@@ -1,9 +1,7 @@
 import {
-  AlertTriangle,
   BarChart3,
   FileSpreadsheet,
   Tag,
-  LayoutDashboard,
   Menu,
   Package,
   Pill,
@@ -27,6 +25,16 @@ function SidebarItem({ id, icon: Icon, label, activeTab, isSidebarOpen, onSelect
   )
 }
 
+function SidebarSection({ label, isSidebarOpen }) {
+  if (!label) return null
+  if (!isSidebarOpen) return <div className="h-px bg-slate-100 my-2" />
+  return (
+    <div className="px-3 pt-2 text-[10px] font-bold uppercase tracking-wider text-slate-400">
+      {label}
+    </div>
+  )
+}
+
 export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggleSidebar }) {
   return (
     <aside
@@ -47,80 +55,22 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
         )}
       </div>
 
-      <nav className="flex-1 p-4 space-y-2 mt-4">
-        <SidebarItem
-          id="dashboard"
-          icon={LayoutDashboard}
-          label="Panel de Control"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="inventory"
-          icon={Pill}
-          label="Inventario"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="catalog"
-          icon={FileSpreadsheet}
-          label="Catálogo"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
+      <nav className="flex-1 p-4 mt-4 space-y-2">
+        <SidebarSection label="Gestión de inventarios" isSidebarOpen={isSidebarOpen} />
+        <SidebarItem id="inventory" icon={Pill} label="Inventario" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+        <SidebarItem id="catalog" icon={FileSpreadsheet} label="Catálogo" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+        <SidebarItem id="categories" icon={Tag} label="Categorías" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
 
-        <SidebarItem
-          id="consumption-monthly"
-          icon={Upload}
-          label="Consumo mensual"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="consumption-summary"
-          icon={BarChart3}
-          label="Resumen consumo"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="order-request"
-          icon={ClipboardList}
-          label="Solicitud Pedido"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="calendar"
-          icon={CalendarDays}
-          label="Calendario"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="tertiary-packaging"
-          icon={Package}
-          label="Empaque Terciario"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
-        <SidebarItem
-          id="categories"
-          icon={Tag}
-          label="Categorías"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
+        <SidebarSection label="Consumos y análisis" isSidebarOpen={isSidebarOpen} />
+        <SidebarItem id="consumption-monthly" icon={Upload} label="Consumo mensual" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+        <SidebarItem id="consumption-summary" icon={BarChart3} label="Resumen de consumo" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+
+        <SidebarSection label="Abastecimiento" isSidebarOpen={isSidebarOpen} />
+        <SidebarItem id="order-request" icon={ClipboardList} label="Solicitud de pedido" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+        <SidebarItem id="tertiary-packaging" icon={Package} label="Empaque terciario" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
+
+        <SidebarSection label="Planificación" isSidebarOpen={isSidebarOpen} />
+        <SidebarItem id="calendar" icon={CalendarDays} label="Calendario" activeTab={activeTab} isSidebarOpen={isSidebarOpen} onSelect={onSelectTab} />
       </nav>
 
       <div className="p-4 border-t border-slate-100">

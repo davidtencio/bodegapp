@@ -76,7 +76,7 @@ function parseIsoDateMs(value) {
 
 export default function BodegaApp() {
   const [todayKey, setTodayKey] = useState(() => new Date().toISOString().slice(0, 10))
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('inventory')
   const [isSidebarOpen, setSidebarOpen] = useState(true)
 
   const [medications, setMedications] = useState([])
