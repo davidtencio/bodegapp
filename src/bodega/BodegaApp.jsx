@@ -1941,7 +1941,6 @@ export default function BodegaApp() {
             lowStockItems={lowStockItems}
             medicationCategories={medicationCategories}
             onViewAllConsumptions={() => setActiveTab('consumption-monthly')}
-            onEditMedication={openEditMedication}
           />
         )}
 

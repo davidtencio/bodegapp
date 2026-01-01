@@ -8,21 +8,11 @@ export default function DashboardView({
   lowStockItems,
   medicationCategories,
   onViewAllConsumptions,
-  onEditMedication,
 }) {
   const formatNumber = (value) => {
     const asNumber = Number(value)
     if (Number.isFinite(asNumber)) return asNumber.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 })
     return String(value ?? '0')
-  }
-
-  const formatExpiry = (value) => {
-    const raw = String(value ?? '').trim()
-    if (!raw) return 'S/N'
-    const iso = raw.slice(0, 10)
-    if (!/^\d{4}-\d{2}-\d{2}$/.test(iso)) return 'S/N'
-    const [y, m, d] = iso.split('-')
-    return `${d}/${m}/${y}`
   }
 
   const escapeHtml = (unsafe) =>
@@ -100,13 +90,11 @@ export default function DashboardView({
         const min = formatNumber(item?.computed_min_stock ?? item?.min_stock)
         const stock = formatNumber(item?.stock)
         const days = item?._daysToReceipt != null ? String(item._daysToReceipt) : ''
-        const expiry = formatExpiry(item?.nearest_expiry_date)
         return `
           <tr>
             <td class="center mono">${escapeHtml(item?.siges_code || '')}</td>
             <td>
               ${escapeHtml(item?.name || '')}
-              <div class="sub">Vence: ${escapeHtml(expiry)}</div>
             </td>
             <td class="center mono">${escapeHtml(min)}</td>
             <td class="center mono">${escapeHtml(stock)}</td>
@@ -255,24 +243,17 @@ export default function DashboardView({
               sortedFilteredLowStockItems.map((item) => (
                 <div
                   key={item.id}
-                  className="flex items-center justify-between p-3 border-l-4 border-red-500 bg-red-50 rounded-r-lg"
+                  className="flex items-center p-3 border-l-4 border-red-500 bg-red-50 rounded-r-lg"
                 >
                   <div>
                     <p className="font-semibold text-sm text-slate-800">{item.name}</p>
                     <p className="text-[11px] text-slate-500 font-mono">
-                      {item.siges_code || ''} · Vence: {formatExpiry(item.nearest_expiry_date)}
+                      {item.siges_code || ''}
                     </p>
                     <p className="text-xs text-slate-500">
                       Mínimo: {formatNumber(item.computed_min_stock ?? item.min_stock)} | Actual: {formatNumber(item.stock)}
                     </p>
                   </div>
-                  <button
-                    type="button"
-                    onClick={() => onEditMedication(item)}
-                    className="text-xs bg-white border border-red-200 text-red-600 px-3 py-1 rounded hover:bg-red-100 transition-colors"
-                  >
-                    Reponer
-                  </button>
                 </div>
               ))
             ) : (
