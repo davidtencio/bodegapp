@@ -18,7 +18,9 @@ export default function PageHeader({ activeTab }) {
                   ? 'Empaque Terciario'
     : activeTab === 'categories'
                   ? 'Categorías'
-                : 'Alertas de Stock'
+    : activeTab === 'alerts'
+                  ? 'Alertas de Stock'
+                : 'Bodegapp'
 
   return (
     <header className="flex justify-between items-center mb-8">

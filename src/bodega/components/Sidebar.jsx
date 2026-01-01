@@ -121,14 +121,6 @@ export default function Sidebar({ activeTab, isSidebarOpen, onSelectTab, onToggl
           isSidebarOpen={isSidebarOpen}
           onSelect={onSelectTab}
         />
-        <SidebarItem
-          id="alerts"
-          icon={AlertTriangle}
-          label="Alertas de Stock"
-          activeTab={activeTab}
-          isSidebarOpen={isSidebarOpen}
-          onSelect={onSelectTab}
-        />
       </nav>
 
       <div className="p-4 border-t border-slate-100">
