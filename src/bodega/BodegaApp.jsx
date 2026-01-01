@@ -1473,11 +1473,12 @@ export default function BodegaApp() {
 
     const current = (await store.getMedications()) ?? []
     const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
-    const byKeyToId = new Map(
+    const byKeyToExisting = new Map(
       existingForType
-        .map((m) => [makeMedicationKey(m), m.id])
+        .map((m) => [makeMedicationKey(m), m])
         .filter(([key]) => Boolean(key)),
     )
+    const byKeyToId = new Map(Array.from(byKeyToExisting.entries()).map(([key, value]) => [key, value.id]))
 
     const now = Date.now()
     const importedMeds = (dataRows ?? [])
@@ -1492,21 +1493,22 @@ export default function BodegaApp() {
         if (!key) return null
 
         const existingId = byKeyToId.get(key)
+        const existing = byKeyToExisting.get(key)
         const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
 
         return {
           id,
           inventory_type: selectedType,
           siges_code,
-          sicop_classifier: '',
-          sicop_identifier: '',
-          name,
-          category: 'General',
-          batch: 'S/N',
-          expiry_date: normalizeDateInput(''),
+          sicop_classifier: String(existing?.sicop_classifier || '').trim(),
+          sicop_identifier: String(existing?.sicop_identifier || '').trim(),
+          name: name || String(existing?.name || '').trim() || 'Sin nombre',
+          category: String(existing?.category || '').trim() || 'General',
+          batch: String(existing?.batch || '').trim() || 'S/N',
+          expiry_date: String(existing?.expiry_date || '').trim() || normalizeDateInput(''),
           stock: parseInventoryNumber(row?.[2]),
-          min_stock: 0,
-          unit: 'Unidad',
+          min_stock: Number(existing?.min_stock) || 0,
+          unit: String(existing?.unit || '').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
@@ -1521,21 +1523,30 @@ export default function BodegaApp() {
         if (!key) return null
 
         const existingId = byKeyToId.get(key)
+        const existing = byKeyToExisting.get(key)
         const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
+        const incomingSicopClassifier = String(row.ClasificadorSICOP || '').trim()
+        const incomingSicopIdentifier = String(row.IdentificadorSICOP || '').trim()
+        const incomingCategory = String(row.Categoria || '').trim()
+        const incomingBatch = String(row.Lote || '').trim()
+        const incomingUnit = String(row.Unidad || '').trim()
+        const incomingExpiry = row.Vencimiento
+        const incomingMinStockRaw = row.StockMinimo
+        const incomingStockRaw = row.Stock ?? row.Inventario ?? row.Existencia ?? row.Saldo
 
         return {
           id,
           inventory_type: selectedType,
           siges_code,
-          sicop_classifier: String(row.ClasificadorSICOP || '').trim(),
-          sicop_identifier: String(row.IdentificadorSICOP || '').trim(),
-          name: name || 'Sin nombre',
-          category: String(row.Categoria || 'General').trim() || 'General',
-          batch: String(row.Lote || 'S/N').trim() || 'S/N',
-          expiry_date: normalizeDateInput(row.Vencimiento),
-          stock: parseInventoryNumber(row.Stock ?? row.Inventario ?? row.Existencia ?? row.Saldo),
-          min_stock: parseInventoryNumber(row.StockMinimo || 0),
-          unit: String(row.Unidad || 'Unidad').trim() || 'Unidad',
+          sicop_classifier: incomingSicopClassifier || String(existing?.sicop_classifier || '').trim(),
+          sicop_identifier: incomingSicopIdentifier || String(existing?.sicop_identifier || '').trim(),
+          name: name || String(existing?.name || '').trim() || 'Sin nombre',
+          category: incomingCategory || String(existing?.category || '').trim() || 'General',
+          batch: incomingBatch || String(existing?.batch || '').trim() || 'S/N',
+          expiry_date: incomingExpiry ? normalizeDateInput(incomingExpiry) : String(existing?.expiry_date || '').trim() || normalizeDateInput(''),
+          stock: parseInventoryNumber(incomingStockRaw),
+          min_stock: incomingMinStockRaw != null && String(incomingMinStockRaw).trim() !== '' ? parseInventoryNumber(incomingMinStockRaw) : Number(existing?.min_stock) || 0,
+          unit: incomingUnit || String(existing?.unit || '').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
