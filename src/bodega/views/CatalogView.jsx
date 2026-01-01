@@ -1,4 +1,4 @@
-import { AlertTriangle, CheckCircle2, Download, Edit2, FileSpreadsheet, Slash, Trash2, Upload } from 'lucide-react'
+import { AlertTriangle, CheckCircle2, Download, Edit2, FileSpreadsheet, Search, Slash, Trash2, Upload } from 'lucide-react'
 import { useMemo, useState } from 'react'
 
 export default function CatalogView({
@@ -55,11 +55,21 @@ export default function CatalogView({
   }, [medications])
 
   const [showDiscontinued, setShowDiscontinued] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
   const visibleMedications = useMemo(() => {
     const base = sortedMedications ?? []
     if (showDiscontinued) return base
     return base.filter((m) => !m?.discontinued_at)
   }, [showDiscontinued, sortedMedications])
+
+  const filteredMedications = useMemo(() => {
+    const q = String(searchQuery || '').trim().toLowerCase()
+    if (!q) return visibleMedications
+    return (visibleMedications ?? []).filter((m) => {
+      const haystack = `${m?.siges_code || ''} ${m?.sicop_classifier || ''} ${m?.sicop_identifier || ''} ${m?.name || ''}`.toLowerCase()
+      return haystack.includes(q)
+    })
+  }, [searchQuery, visibleMedications])
 
   return (
     <div className="space-y-6">
@@ -126,9 +136,19 @@ export default function CatalogView({
         </div>
 
         <div className="lg:col-span-2 bg-white rounded-2xl border border-slate-200 shadow-sm overflow-hidden">
-          <div className="p-4 border-b border-slate-100 bg-slate-50 flex justify-between items-center">
+          <div className="p-4 border-b border-slate-100 bg-slate-50 flex flex-col gap-3 lg:flex-row lg:justify-between lg:items-center">
             <h3 className="font-bold text-slate-800">Vista Previa del Catálogo</h3>
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="relative w-full sm:w-72">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 text-slate-400" size={16} />
+                <input
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  placeholder="Buscar por SIGES, SICOP o nombre..."
+                  className="w-full pl-9 pr-3 py-2 border border-slate-200 rounded-lg text-sm bg-white focus:ring-2 focus:ring-blue-500 outline-none"
+                />
+              </div>
               <label className="flex items-center gap-2 text-xs text-slate-600 font-bold select-none">
                 <input
                   type="checkbox"
@@ -190,7 +210,7 @@ export default function CatalogView({
                 </tr>
               </thead>
               <tbody className="divide-y divide-slate-100">
-                {visibleMedications.map((item) => (
+                {filteredMedications.map((item) => (
                   <tr
                     key={item.id}
                     className={`hover:bg-slate-50 transition-colors group ${item.discontinued_at ? 'opacity-60' : ''}`}
