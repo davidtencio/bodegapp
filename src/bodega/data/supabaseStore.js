@@ -115,11 +115,17 @@ export const supabaseStore = {
     return { ...batch, items }
   },
 
+  async deleteMonthlyBatch(id) {
+    const client = getRequiredSupabase()
+    const { error } = await client.from('monthly_batches').delete().eq('id', id)
+    if (error) throw error
+  },
+
   async getSelectedMonthlyBatchId() {
     return null
   },
 
-  async setSelectedMonthlyBatchId() {},
+  async setSelectedMonthlyBatchId() { },
 
   async getTertiaryPackaging() {
     const client = getRequiredSupabase()

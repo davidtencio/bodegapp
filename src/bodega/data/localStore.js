@@ -144,6 +144,12 @@ export const localStore = {
     return normalized
   },
 
+  async deleteMonthlyBatch(id) {
+    const current = (await this.getMonthlyBatches()) ?? []
+    const next = current.filter((b) => String(b.id) !== String(id))
+    writeJson(STORAGE_KEYS.monthlyBatches, next)
+  },
+
   async getSelectedMonthlyBatchId() {
     const raw = window.localStorage.getItem(STORAGE_KEYS.selectedMonthlyBatchId)
     const parsed = raw ? safeJsonParse(raw) ?? raw : null

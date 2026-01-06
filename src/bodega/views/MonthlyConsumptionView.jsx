@@ -1,4 +1,4 @@
-import { FileDown, RefreshCcw, Upload } from 'lucide-react'
+import { FileDown, RefreshCcw, Upload, Trash2 } from 'lucide-react'
 
 function StatusBanner({ status }) {
   if (!status?.message) return null
@@ -27,6 +27,7 @@ export default function MonthlyConsumptionView({
   onFileChange,
   onDownloadTemplate,
   onRefresh,
+  onDeleteMonth,
 }) {
   const selected = months.find((m) => m.id === selectedMonthId) || null
 
@@ -94,18 +95,29 @@ export default function MonthlyConsumptionView({
 
         <div className="mt-4 flex flex-col gap-2 md:flex-row md:items-center">
           <label className="text-xs font-semibold text-slate-600">Mes cargado</label>
-          <select
-            className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white"
-            value={selectedMonthId ?? ''}
-            onChange={(e) => onSelectMonth(e.target.value || null)}
-          >
-            <option value="">Seleccione un mes...</option>
-            {months.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.label}
-              </option>
-            ))}
-          </select>
+          <div className="flex items-center gap-2 flex-1 max-w-sm">
+            <select
+              className="border border-slate-200 rounded-lg px-3 py-2 text-sm bg-white flex-1"
+              value={selectedMonthId ?? ''}
+              onChange={(e) => onSelectMonth(e.target.value || null)}
+            >
+              <option value="">Seleccione un mes...</option>
+              {months.map((m) => (
+                <option key={m.id} value={m.id}>
+                  {m.label}
+                </option>
+              ))}
+            </select>
+            <button
+              type="button"
+              onClick={() => onDeleteMonth && onDeleteMonth(selectedMonthId)}
+              disabled={!selectedMonthId}
+              className="p-2 rounded-lg border border-rose-200 text-rose-600 hover:bg-rose-50 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
+              title="Eliminar este mes"
+            >
+              <Trash2 size={18} />
+            </button>
+          </div>
         </div>
       </div>
 

@@ -497,18 +497,18 @@ export default function BodegaApp() {
       const filteredForMovement =
         hideInventoryNoMovement4m && hasAnyMonthlyData
           ? grouped771.filter((row) => {
-              const code = String(row?.siges_code || '').trim()
-              if (!code) return true
-              return (movementByCodeLast4Months.get(code) || 0) > 0
-            })
+            const code = String(row?.siges_code || '').trim()
+            if (!code) return true
+            return (movementByCodeLast4Months.get(code) || 0) > 0
+          })
           : grouped771
 
       const filtered = query
         ? filteredForMovement.filter((row) => {
-            const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
-            const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
-            return haystack.includes(query)
-          })
+          const lots = row.lots.map((l) => `${l.batch} ${l.expiry_date} ${l.stock}`).join(' ')
+          const haystack = `${row.siges_code} ${row.name} ${lots}`.toLowerCase()
+          return haystack.includes(query)
+        })
         : filteredForMovement
 
       filtered.sort(compareInventoryRows)
@@ -587,10 +587,10 @@ export default function BodegaApp() {
 
       const filteredForMovement = hideInventoryTotalNoMovement && hasAnyMonthlyData
         ? merged.filter((row) => {
-            const code = String(row.siges_code || '').trim()
-            if (!code) return false
-            return (movementByCodeLast4Months.get(code) || 0) > 0
-          })
+          const code = String(row.siges_code || '').trim()
+          if (!code) return false
+          return (movementByCodeLast4Months.get(code) || 0) > 0
+        })
         : merged
 
       if (!query) return filteredForMovement
@@ -605,17 +605,17 @@ export default function BodegaApp() {
     const filteredForMovement =
       hideInventoryNoMovement4m && hasAnyMonthlyData
         ? base.filter((m) => {
-            const code = String(m?.siges_code || '').trim()
-            if (!code) return true
-            return (movementByCodeLast4Months.get(code) || 0) > 0
-          })
+          const code = String(m?.siges_code || '').trim()
+          if (!code) return true
+          return (movementByCodeLast4Months.get(code) || 0) > 0
+        })
         : base
 
     const filtered = query
       ? filteredForMovement.filter((m) => {
-          const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
-          return haystack.includes(query)
-        })
+        const haystack = `${m.siges_code} ${m.name} ${m.category} ${m.batch} ${m.expiry_date} ${m.unit}`.toLowerCase()
+        return haystack.includes(query)
+      })
       : filteredForMovement
 
     filtered.sort(compareInventoryRows)
@@ -1854,6 +1854,37 @@ export default function BodegaApp() {
     }
   }
 
+  const deleteMonthlyBatch = async (id) => {
+    if (!id) return
+    const batch = monthlyBatches.find((b) => b.id === id)
+    const label = batch?.label || 'Sin nombre'
+
+    if (!window.confirm(`¿Estás seguro de que deseas eliminar la carga del mes "${label}"? Esta acción no se puede deshacer.`)) {
+      return
+    }
+
+    try {
+      setMonthlyStatus({ loading: true, message: `Eliminando mes "${label}"...`, type: 'info' })
+      await store.deleteMonthlyBatch(id)
+
+      const nextBatches = await store.getMonthlyBatches()
+      const normalized = (nextBatches ?? []).map((b) => ({ ...b, id: b?.id != null ? String(b.id) : b.id }))
+      setMonthlyBatches(normalized)
+
+      const nextId = normalized.length > 0 ? normalized[0].id : null
+      selectMonthlyBatch(nextId)
+
+      setMonthlyStatus({ loading: false, message: `Mes "${label}" eliminado con éxito.`, type: 'success' })
+      window.setTimeout(() => setMonthlyStatus({ loading: false, message: '', type: '' }), 4000)
+    } catch (err) {
+      setMonthlyStatus({
+        loading: false,
+        message: err?.message ? String(err.message) : 'Error al eliminar el mes.',
+        type: 'error',
+      })
+    }
+  }
+
   const refreshInventories = async () => {
     try {
       setInventoryStatus({ loading: true, message: 'Sincronizando inventarios...', type: 'info' })
@@ -1903,11 +1934,10 @@ export default function BodegaApp() {
 
         {appStatus.message && (
           <div
-            className={`mb-6 p-3 rounded-lg text-xs flex items-center justify-between gap-3 ${
-              appStatus.type === 'error'
-                ? 'bg-red-50 text-red-700 border border-red-100'
-                : 'bg-blue-50 text-blue-700 border border-blue-100'
-            }`}
+            className={`mb-6 p-3 rounded-lg text-xs flex items-center justify-between gap-3 ${appStatus.type === 'error'
+              ? 'bg-red-50 text-red-700 border border-red-100'
+              : 'bg-blue-50 text-blue-700 border border-blue-100'
+              }`}
           >
             <span>{appStatus.message}</span>
             <button
@@ -2006,6 +2036,7 @@ export default function BodegaApp() {
             onFileChange={processMonthlyConsumptionCsv}
             onDownloadTemplate={downloadMonthlyConsumptionTemplateCsv}
             onRefresh={refreshMonthlyBatches}
+            onDeleteMonth={deleteMonthlyBatch}
           />
         )}
 
