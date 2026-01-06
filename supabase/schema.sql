@@ -25,6 +25,7 @@ create table if not exists public.medications (
   category text,
   batch text,
   expiry_date date,
+  discontinued_at timestamptz,
   stock numeric not null default 0,
   min_stock numeric not null default 0,
   unit text,
@@ -35,6 +36,9 @@ create table if not exists public.medications (
 -- Migracion segura si ya existia la tabla
 alter table if exists public.medications
   add column if not exists inventory_type text not null default '772';
+
+alter table if exists public.medications
+  add column if not exists discontinued_at timestamptz;
 
 alter table if exists public.medications
   alter column stock type numeric using stock::numeric;

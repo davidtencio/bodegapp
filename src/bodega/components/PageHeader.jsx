@@ -4,6 +4,8 @@ export default function PageHeader({ activeTab }) {
       ? 'Resumen General'
     : activeTab === 'inventory'
         ? 'Gestión de Inventario'
+    : activeTab === 'inventory-take'
+          ? 'Toma Inventario'
     : activeTab === 'catalog'
           ? 'Catálogo de Productos'
     : activeTab === 'consumption-monthly'
@@ -18,7 +20,9 @@ export default function PageHeader({ activeTab }) {
                   ? 'Empaque Terciario'
     : activeTab === 'categories'
                   ? 'Categorías'
-                : 'Alertas de Stock'
+    : activeTab === 'alerts'
+                  ? 'Alertas de Stock'
+                : 'Bodegapp'
 
   return (
     <header className="flex justify-between items-center mb-8">

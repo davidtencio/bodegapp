@@ -8,6 +8,7 @@ import CatalogView from './views/CatalogView.jsx'
 import ConsumptionSummaryView from './views/ConsumptionSummaryView.jsx'
 import DashboardView from './views/DashboardView.jsx'
 import InventoryView from './views/InventoryView.jsx'
+import InventoryTakeView from './views/InventoryTakeView.jsx'
 import MonthlyConsumptionView from './views/MonthlyConsumptionView.jsx'
 import OrderRequestView from './views/OrderRequestView.jsx'
 import TertiaryPackagingView from './views/TertiaryPackagingView.jsx'
@@ -76,10 +77,14 @@ function parseIsoDateMs(value) {
 
 export default function BodegaApp() {
   const [todayKey, setTodayKey] = useState(() => new Date().toISOString().slice(0, 10))
-  const [activeTab, setActiveTab] = useState('dashboard')
+  const [activeTab, setActiveTab] = useState('inventory')
   const [isSidebarOpen, setSidebarOpen] = useState(true)
 
   const [medications, setMedications] = useState([])
+  const activeMedications = useMemo(
+    () => (medications ?? []).filter((m) => !m?.discontinued_at),
+    [medications],
+  )
   const [inventorySearch, setInventorySearch] = useState('')
   const [inventoryType, setInventoryType] = useState('772')
   const [hideInventoryNoMovement4m, setHideInventoryNoMovement4m] = useState(false)
@@ -93,6 +98,7 @@ export default function BodegaApp() {
   const [appStatus, setAppStatus] = useState({ loading: true, message: '', type: '' })
 
   const fileInputRef = useRef(null)
+  const sicopFileInputRef = useRef(null)
   const [excelStatus, setExcelStatus] = useState({ loading: false, message: '', type: '' })
 
   const inventoryFileInputRef = useRef(null)
@@ -331,7 +337,7 @@ export default function BodegaApp() {
     const daysFactor = Math.max(0, Number(daysToReceipt) || 0) + 4
 
     const byCode = new Map()
-    for (const m of medications ?? []) {
+    for (const m of activeMedications ?? []) {
       const code = String(m?.siges_code || '').trim()
       if (!code) continue
       const existing = byCode.get(code)
@@ -403,16 +409,16 @@ export default function BodegaApp() {
         (Number(b.computed_min_stock) || 0) - (Number(b.stock) || 0) - ((Number(a.computed_min_stock) || 0) - (Number(a.stock) || 0)),
     )
     return results
-  }, [avgMonthlyConsumptionByCode, medications, movementByCodeLast4Months, nextReceiptDate, todayKey])
+  }, [activeMedications, avgMonthlyConsumptionByCode, movementByCodeLast4Months, nextReceiptDate, todayKey])
 
   const stats = useMemo(
     () => ({
-      totalItems: medications.length,
+      totalItems: activeMedications.length,
       lowStockCount: lowStockItems.length,
-      totalStockValue: medications.reduce((acc, curr) => acc + curr.stock, 0),
+      totalStockValue: activeMedications.reduce((acc, curr) => acc + curr.stock, 0),
       recentConsumptions: monthlyBatches[0]?.items?.length || 0,
     }),
-    [medications, lowStockItems, monthlyBatches],
+    [activeMedications, lowStockItems, monthlyBatches],
   )
 
   const filteredInventory = useMemo(() => {
@@ -1110,9 +1116,9 @@ export default function BodegaApp() {
     const newMed = {
       id: editingMed ? editingMed.id : globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : Date.now(),
       inventory_type: editingMed?.inventory_type ?? String(inventoryType || '772'),
-      siges_code: editingMed?.siges_code ?? '',
-      sicop_classifier: editingMed?.sicop_classifier ?? '',
-      sicop_identifier: editingMed?.sicop_identifier ?? '',
+      siges_code: String(formData.get('siges_code') ?? editingMed?.siges_code ?? '').trim(),
+      sicop_classifier: String(formData.get('sicop_classifier') ?? editingMed?.sicop_classifier ?? '').trim(),
+      sicop_identifier: String(formData.get('sicop_identifier') ?? editingMed?.sicop_identifier ?? '').trim(),
       name: String(formData.get('name') || '').trim(),
       category: String(formData.get('category') || '').trim(),
       batch: String(formData.get('batch') || '').trim(),
@@ -1148,6 +1154,41 @@ export default function BodegaApp() {
       setAppStatus({
         loading: false,
         message: err?.message ? String(err.message) : 'No se pudo eliminar el medicamento.',
+        type: 'error',
+      })
+    }
+  }
+
+  const toggleDiscontinueMedication = async (med) => {
+    const current = med ? { ...med } : null
+    if (!current?.id) return
+
+    const isDiscontinued = Boolean(current?.discontinued_at)
+    const ok = window.confirm(
+      isDiscontinued
+        ? '¿Desea reactivar este medicamento?'
+        : '¿Desea marcar este medicamento como descontinuado? No se eliminará, solo se ocultará por defecto en Catálogo.',
+    )
+    if (!ok) return
+
+    try {
+      setAppStatus({ loading: true, message: isDiscontinued ? 'Reactivando...' : 'Descontinuando...', type: 'info' })
+      const next = {
+        ...current,
+        discontinued_at: isDiscontinued ? null : new Date().toISOString(),
+      }
+      await store.upsertMedication(next)
+      await reloadMedications()
+      setAppStatus({ loading: false, message: '', type: '' })
+    } catch (err) {
+      const raw = err?.message ? String(err.message) : ''
+      const hint =
+        raw.includes('discontinued_at') && dataProvider === 'supabase' && isSupabaseConfigured
+          ? ' En Supabase falta la columna `discontinued_at`. Ejecuta `supabase/schema.sql` y vuelve a intentar.'
+          : ''
+      setAppStatus({
+        loading: false,
+        message: `${raw || 'No se pudo actualizar el medicamento.'}${hint}`,
         type: 'error',
       })
     }
@@ -1466,28 +1507,23 @@ export default function BodegaApp() {
     const selectedType = String(type || '772').trim() || '772'
 
     const rows = readCsvAsRows(text)
-    const dataRows = looksLikeInventoryHeaderRow(rows?.[0]) ? rows.slice(1) : rows
-
-    const hasThreeColumns = dataRows.some((row) => {
-      const siges = String(row?.[0] ?? '').trim()
-      const name = String(row?.[1] ?? '').trim()
-      return Boolean(siges && name)
-    })
-
-    const data = hasThreeColumns ? null : readCsvAsJson(text)
+    const hasHeaderRow = looksLikeInventoryHeaderRow(rows?.[0])
+    const dataRows = hasHeaderRow ? rows.slice(1) : rows
+    const data = hasHeaderRow ? readCsvAsJson(text) : null
 
     const current = (await store.getMedications()) ?? []
     const existingForType = current.filter((m) => String(m.inventory_type || '772') === selectedType)
-    const byKeyToId = new Map(
+    const byKeyToExisting = new Map(
       existingForType
-        .map((m) => [makeMedicationKey(m), m.id])
+        .map((m) => [makeMedicationKey(m), m])
         .filter(([key]) => Boolean(key)),
     )
+    const byKeyToId = new Map(Array.from(byKeyToExisting.entries()).map(([key, value]) => [key, value.id]))
 
     const now = Date.now()
     const importedMeds = (dataRows ?? [])
       .map((row, index) => {
-        if (!hasThreeColumns) return null
+        if (hasHeaderRow) return null
 
         const siges_code = String(row?.[0] ?? '').trim()
         const name = String(row?.[1] ?? '').trim()
@@ -1497,28 +1533,29 @@ export default function BodegaApp() {
         if (!key) return null
 
         const existingId = byKeyToId.get(key)
+        const existing = byKeyToExisting.get(key)
         const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
 
         return {
           id,
           inventory_type: selectedType,
           siges_code,
-          sicop_classifier: '',
-          sicop_identifier: '',
-          name,
-          category: 'General',
-          batch: 'S/N',
-          expiry_date: normalizeDateInput(''),
+          sicop_classifier: String(existing?.sicop_classifier || '').trim(),
+          sicop_identifier: String(existing?.sicop_identifier || '').trim(),
+          name: name || String(existing?.name || '').trim() || 'Sin nombre',
+          category: String(existing?.category || '').trim() || 'General',
+          batch: String(existing?.batch || '').trim() || 'S/N',
+          expiry_date: String(existing?.expiry_date || '').trim() || normalizeDateInput(''),
           stock: parseInventoryNumber(row?.[2]),
-          min_stock: 0,
-          unit: 'Unidad',
+          min_stock: Number(existing?.min_stock) || 0,
+          unit: String(existing?.unit || '').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
 
     const importedFromJson = (data ?? [])
       .map((row, index) => {
-        if (hasThreeColumns) return null
+        if (!hasHeaderRow) return null
 
         const siges_code = String(row.CodigoSIGES || '').trim()
         const name = String(row.Medicamento || row.Nombre || '').trim()
@@ -1526,26 +1563,35 @@ export default function BodegaApp() {
         if (!key) return null
 
         const existingId = byKeyToId.get(key)
+        const existing = byKeyToExisting.get(key)
         const id = existingId ?? (globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : now + index)
+        const incomingSicopClassifier = String(row.ClasificadorSICOP || '').trim()
+        const incomingSicopIdentifier = String(row.IdentificadorSICOP || '').trim()
+        const incomingCategory = String(row.Categoria || '').trim()
+        const incomingBatch = String(row.Lote || '').trim()
+        const incomingUnit = String(row.Unidad || '').trim()
+        const incomingExpiry = row.Vencimiento
+        const incomingMinStockRaw = row.StockMinimo
+        const incomingStockRaw = row.Stock ?? row.Inventario ?? row.Existencia ?? row.Saldo
 
         return {
           id,
           inventory_type: selectedType,
           siges_code,
-          sicop_classifier: String(row.ClasificadorSICOP || '').trim(),
-          sicop_identifier: String(row.IdentificadorSICOP || '').trim(),
-          name: name || 'Sin nombre',
-          category: String(row.Categoria || 'General').trim() || 'General',
-          batch: String(row.Lote || 'S/N').trim() || 'S/N',
-          expiry_date: normalizeDateInput(row.Vencimiento),
-          stock: parseInventoryNumber(row.Stock),
-          min_stock: parseInventoryNumber(row.StockMinimo || 0),
-          unit: String(row.Unidad || 'Unidad').trim() || 'Unidad',
+          sicop_classifier: incomingSicopClassifier || String(existing?.sicop_classifier || '').trim(),
+          sicop_identifier: incomingSicopIdentifier || String(existing?.sicop_identifier || '').trim(),
+          name: name || String(existing?.name || '').trim() || 'Sin nombre',
+          category: incomingCategory || String(existing?.category || '').trim() || 'General',
+          batch: incomingBatch || String(existing?.batch || '').trim() || 'S/N',
+          expiry_date: incomingExpiry ? normalizeDateInput(incomingExpiry) : String(existing?.expiry_date || '').trim() || normalizeDateInput(''),
+          stock: parseInventoryNumber(incomingStockRaw),
+          min_stock: incomingMinStockRaw != null && String(incomingMinStockRaw).trim() !== '' ? parseInventoryNumber(incomingMinStockRaw) : Number(existing?.min_stock) || 0,
+          unit: incomingUnit || String(existing?.unit || '').trim() || 'Unidad',
         }
       })
       .filter(Boolean)
 
-    const combined = hasThreeColumns ? importedMeds : importedFromJson
+    const combined = hasHeaderRow ? importedFromJson : importedMeds
 
     await store.upsertMedications(combined)
 
@@ -1609,6 +1655,72 @@ export default function BodegaApp() {
         setExcelStatus({
           loading: false,
           message: extraHint ? `${rawMessage}. ${extraHint}` : rawMessage || 'Error al procesar/guardar el CSV.',
+          type: 'error',
+        })
+      }
+    }
+    reader.readAsText(file)
+    e.target.value = null
+  }
+
+  const processSicopCsv = (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+
+    setExcelStatus({ loading: true, message: 'Procesando SICOP...', type: 'info' })
+
+    const reader = new FileReader()
+    reader.onerror = () => {
+      setExcelStatus({ loading: false, message: 'No se pudo leer el archivo.', type: 'error' })
+    }
+    reader.onload = async (evt) => {
+      try {
+        const text = String(evt.target?.result || '')
+        const rows = readCsvAsJson(text)
+
+        const byCode = new Map()
+        for (const row of rows ?? []) {
+          const code = String(row?.CodigoSIGES || '').trim()
+          if (!code) continue
+          const classifier = String(row?.ClasificadorSICOP || '').trim()
+          const identifier = String(row?.IdentificadorSICOP || '').trim()
+          if (!classifier && !identifier) continue
+          byCode.set(code, { classifier, identifier })
+        }
+
+        if (byCode.size === 0) {
+          setExcelStatus({
+            loading: false,
+            message: 'No se encontraron filas con CodigoSIGES y valores SICOP.',
+            type: 'error',
+          })
+          return
+        }
+
+        const current = (await store.getMedications()) ?? []
+        const updated = current.map((m) => {
+          const code = String(m?.siges_code || '').trim()
+          const patch = byCode.get(code)
+          if (!patch) return m
+          return {
+            ...m,
+            sicop_classifier: patch.classifier || String(m?.sicop_classifier || '').trim(),
+            sicop_identifier: patch.identifier || String(m?.sicop_identifier || '').trim(),
+          }
+        })
+
+        await store.upsertMedications(updated)
+        await reloadMedications()
+        setExcelStatus({
+          loading: false,
+          message: `SICOP actualizado para ${byCode.size} códigos SIGES.`,
+          type: 'success',
+        })
+        window.setTimeout(() => setExcelStatus({ loading: false, message: '', type: '' }), 4000)
+      } catch (err) {
+        setExcelStatus({
+          loading: false,
+          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV de SICOP.',
           type: 'error',
         })
       }
@@ -1955,10 +2067,14 @@ export default function BodegaApp() {
             medications={medications}
             excelStatus={excelStatus}
             fileInputRef={fileInputRef}
+            sicopFileInputRef={sicopFileInputRef}
             onChooseFile={() => fileInputRef.current?.click()}
+            onChooseSicopFile={() => sicopFileInputRef.current?.click()}
             onDownloadTemplate={downloadCatalogTemplateCsv}
             onFileChange={processCsv}
+            onSicopFileChange={processSicopCsv}
             onEditMedication={openEditMedication}
+            onDiscontinueMedication={toggleDiscontinueMedication}
             onDeleteMedication={deleteMedication}
             onClearCatalog={clearCatalog}
           />
@@ -1971,7 +2087,6 @@ export default function BodegaApp() {
             lowStockItems={lowStockItems}
             medicationCategories={medicationCategories}
             onViewAllConsumptions={() => setActiveTab('consumption-monthly')}
-            onEditMedication={openEditMedication}
           />
         )}
 
@@ -2025,6 +2140,8 @@ export default function BodegaApp() {
           />
         )}
 
+        {activeTab === 'inventory-take' && <InventoryTakeView medications={medications} />}
+
         {activeTab === 'consumption-monthly' && (
           <MonthlyConsumptionView
             months={monthlyBatches}
@@ -2050,7 +2167,7 @@ export default function BodegaApp() {
 
         {activeTab === 'order-request' && (
           <OrderRequestView
-            medications={medications}
+            medications={activeMedications}
             months={monthlyBatches}
             tertiaryPackaging={tertiaryPackaging}
             medicationCategories={medicationCategories}
