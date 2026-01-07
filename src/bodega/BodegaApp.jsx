@@ -18,7 +18,9 @@ import {
   downloadCatalogTemplateCsv,
   downloadInventoryTemplateCsv,
   downloadInventoryTemplateXml,
-  downloadMonthlyConsumptionTemplateCsv,
+  downloadInventoryTemplateCsv,
+  downloadInventoryTemplateXml,
+  normalizeDateInput,
   normalizeDateInput,
   readCsvAsJson,
   readCsvAsRows,
@@ -1845,7 +1847,16 @@ export default function BodegaApp() {
     return base || 'Mes sin nombre'
   }
 
-  const processMonthlyConsumptionCsv = (e) => {
+  const downloadMonthlyConsumptionTemplateXlsx = () => {
+    const headers = ['CodigoSIGES', 'Medicamento', 'Consumo', 'Costo']
+    const example = ['110-16-0010', 'Paracetamol', 1555.85, 1486210.15]
+    const ws = XLSX.utils.aoa_to_sheet([headers, example])
+    const wb = XLSX.utils.book_new()
+    XLSX.utils.book_append_sheet(wb, ws, 'Plantilla')
+    XLSX.writeFile(wb, 'plantilla_consumo_mensual.xlsx')
+  }
+
+  const processMonthlyConsumptionXlsx = (e) => {
     const file = e.target.files?.[0]
     if (!file) return
 
@@ -1858,35 +1869,86 @@ export default function BodegaApp() {
     }
     reader.onload = async (evt) => {
       try {
-        const text = String(evt.target?.result || '')
-        const rows = readCsvAsRows(text)
+        const data = evt.target?.result
+        const workbook = XLSX.read(data, { type: 'array' })
+        const sheetName = workbook.SheetNames[0]
+        const sheet = workbook.Sheets[sheetName]
+        const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
-        const looksLikeHeaderRow = (cells) =>
-          (cells || []).some((cell) => /codigo|siges|medicamento|consumo|costo/i.test(String(cell || '')))
+        // Helper to find header row index
+        const headerRowIndex = rows.findIndex((row) =>
+          (row || []).some((cell) => /codigo|siges|medicamento|consumo|costo/i.test(String(cell || '')))
+        )
+
+        const headerRow = headerRowIndex >= 0 ? rows[headerRowIndex] : []
+        const dataRows = headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows
+
+        // Dynamic column mapping based on headers
+        const getColumnIndex = (patterns) => {
+          if (!headerRow || headerRow.length === 0) return -1
+          return headerRow.findIndex((cell) => patterns.some((p) => p.test(String(cell || ''))))
+        }
+
+        let codeIdx = getColumnIndex([/codigo/i, /siges/i])
+        let nameIdx = getColumnIndex([/medicamento/i, /nombre/i, /descripcion/i])
+        let qtyIdx = getColumnIndex([/consumo/i, /cantidad/i])
+        let costIdx = getColumnIndex([/costo/i, /monto/i, /fob/i, /precio/i])
+
+        // Fallback heuristics if headers aren't clear/found
+        // Scenario A: User format (A=Code, C=Name, D=Cons, F=Cost) -> Indices 0, 2, 3, 5
+        // Scenario B: Template format (A=Code, B=Name, C=Cons, D=Cost) -> Indices 0, 1, 2, 3
+        if (codeIdx === -1 || nameIdx === -1 || qtyIdx === -1 || costIdx === -1) {
+          // Peek at first data row to guess
+          const firstData = dataRows[0] || []
+
+          const isNumber = (val) => {
+            if (typeof val === 'number') return true
+            const s = String(val || '').trim()
+            return s && !Number.isNaN(Number(s.replace(/,/g, '').replace('¢', '')))
+          }
+          const isString = (val) => typeof val === 'string' && val.trim().length > 0 && !isNumber(val)
+
+          // Check User Format: Col C (2) is Name/String, Col D (3) is Number, Col F (5) is Number
+          const matchesUserFormat = isString(firstData[2]) && isNumber(firstData[3]) && isNumber(firstData[5])
+
+          if (matchesUserFormat) {
+            codeIdx = 0
+            nameIdx = 2
+            qtyIdx = 3
+            costIdx = 5
+          } else {
+            // Default to Template/Compact format
+            codeIdx = 0
+            nameIdx = 1
+            qtyIdx = 2
+            costIdx = 3
+          }
+        }
 
         const parseNumber = (value) => {
           const raw = String(value ?? '').trim()
           if (!raw) return 0
+          if (typeof value === 'number') return value
+
           const normalized =
             raw.includes(',') && raw.includes('.')
               ? raw.replace(/,/g, '')
               : raw.includes(',') && !raw.includes('.')
                 ? raw.replace(/,/g, '.')
                 : raw
-          const asNumber = Number.parseFloat(normalized.replace(/\s+/g, ''))
+          const asNumber = Number.parseFloat(normalized.replace(/[^0-9.-]/g, ''))
           return Number.isFinite(asNumber) ? asNumber : 0
         }
 
-        const dataRows = looksLikeHeaderRow(rows[0]) ? rows.slice(1) : rows
-
         const importedItems = dataRows
           .map((row) => {
-            const siges_code = String(row?.[0] ?? '').trim()
-            const medication_name = String(row?.[1] ?? '').trim()
-            const quantity = parseNumber(row?.[2])
-            const cost = parseNumber(row?.[3])
+            const siges_code = String(row?.[codeIdx] ?? '').trim()
+            const medication_name = String(row?.[nameIdx] ?? '').trim()
+            const quantity = parseNumber(row?.[qtyIdx])
+            const cost = parseNumber(row?.[costIdx])
 
-            if (!siges_code || !medication_name) return null
+            if (!siges_code && !medication_name) return null
+            if (!siges_code) return null // Strict code requirement?
 
             return {
               id: globalThis.crypto?.randomUUID ? globalThis.crypto.randomUUID() : String(Date.now()) + Math.random(),
@@ -1917,13 +1979,13 @@ export default function BodegaApp() {
       } catch (err) {
         setMonthlyStatus({
           loading: false,
-          message: err?.message ? String(err.message) : 'Error al procesar/guardar el CSV.',
+          message: err?.message ? String(err.message) : 'Error al procesar/guardar el Excel.',
           type: 'error',
         })
       }
     }
 
-    reader.readAsText(file)
+    reader.readAsArrayBuffer(file)
     e.target.value = null
   }
 
@@ -2150,8 +2212,8 @@ export default function BodegaApp() {
             monthlyStatus={monthlyStatus}
             fileInputRef={monthlyFileInputRef}
             onChooseFile={() => monthlyFileInputRef.current?.click()}
-            onFileChange={processMonthlyConsumptionCsv}
-            onDownloadTemplate={downloadMonthlyConsumptionTemplateCsv}
+            onFileChange={processMonthlyConsumptionXlsx}
+            onDownloadTemplate={downloadMonthlyConsumptionTemplateXlsx}
             onRefresh={refreshMonthlyBatches}
             onDeleteMonth={deleteMonthlyBatch}
           />

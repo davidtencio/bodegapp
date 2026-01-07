@@ -55,13 +55,13 @@ export default function MonthlyConsumptionView({
           <div className="space-y-1">
             <h3 className="font-semibold text-slate-800">Importar consumo mensual</h3>
             <p className="text-xs text-slate-500">
-              Recomendado: nombre del archivo <span className="font-mono">Enero 2025.csv</span> (se usa como nombre del
+              Recomendado: nombre del archivo <span className="font-mono">Enero 2025.xlsx</span> (se usa como nombre del
               mes).
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2">
-            <input type="file" ref={fileInputRef} onChange={onFileChange} accept=".csv" className="hidden" />
+            <input type="file" ref={fileInputRef} onChange={onFileChange} accept=".xlsx, .xls" className="hidden" />
             <button
               type="button"
               onClick={onDownloadTemplate}
@@ -84,7 +84,7 @@ export default function MonthlyConsumptionView({
               className="px-3 py-2 rounded-lg bg-blue-600 hover:bg-blue-700 text-white text-sm flex items-center gap-2"
             >
               <Upload size={16} />
-              Importar CSV
+              Importar Excel
             </button>
           </div>
         </div>
