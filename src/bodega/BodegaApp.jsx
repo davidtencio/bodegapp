@@ -1870,6 +1870,21 @@ export default function BodegaApp() {
         const workbook = XLSX.read(data, { type: 'array' })
         const sheetName = workbook.SheetNames[0]
         const sheet = workbook.Sheets[sheetName]
+
+        // Fix: recalculate range to ensure all rows are read (in case of bad !ref)
+        const range = { s: { c: 10000000, r: 10000000 }, e: { c: 0, r: 0 } }
+        let hasCells = false
+        Object.keys(sheet).forEach((ref) => {
+          if (ref[0] === '!') return
+          hasCells = true
+          const c = XLSX.utils.decode_cell(ref)
+          range.s.c = Math.min(range.s.c, c.c)
+          range.s.r = Math.min(range.s.r, c.r)
+          range.e.c = Math.max(range.e.c, c.c)
+          range.e.r = Math.max(range.e.r, c.r)
+        })
+        if (hasCells) sheet['!ref'] = XLSX.utils.encode_range(range)
+
         const rows = XLSX.utils.sheet_to_json(sheet, { header: 1 })
 
         // Helper to find header row index
@@ -1881,15 +1896,20 @@ export default function BodegaApp() {
         const dataRows = headerRowIndex >= 0 ? rows.slice(headerRowIndex + 1) : rows
 
         // Dynamic column mapping based on headers
-        const getColumnIndex = (patterns) => {
+        const getColumnIndex = (patterns, excludePatterns = []) => {
           if (!headerRow || headerRow.length === 0) return -1
-          return headerRow.findIndex((cell) => patterns.some((p) => p.test(String(cell || ''))))
+          return headerRow.findIndex((cell) => {
+            const s = String(cell || '').toLowerCase()
+            return patterns.some((p) => p.test(s)) && !excludePatterns.some((p) => p.test(s))
+          })
         }
 
         let codeIdx = getColumnIndex([/codigo/i, /siges/i])
         let nameIdx = getColumnIndex([/medicamento/i, /nombre/i, /descripcion/i])
         let qtyIdx = getColumnIndex([/consumo/i, /cantidad/i])
-        let costIdx = getColumnIndex([/costo/i, /monto/i, /fob/i, /precio/i])
+        // Prefer "Total Cost" over "Unit Cost". Exclude "unit" if possible.
+        let costIdx = getColumnIndex([/costo/i, /monto/i, /fob/i, /precio/i], [/unit/i, /u\./i, /unitario/i])
+        if (costIdx === -1) costIdx = getColumnIndex([/costo/i, /monto/i, /fob/i, /precio/i])
 
         // Fallback heuristics if headers aren't clear/found
         // Scenario A: User format (A=Code, C=Name, D=Cons, F=Cost) -> Indices 0, 2, 3, 5
@@ -1906,12 +1926,12 @@ export default function BodegaApp() {
           const isString = (val) => typeof val === 'string' && val.trim().length > 0 && !isNumber(val)
 
           // Check User Format: Col C (2) is Name/String, Col D (3) is Number, Col F (5) is Number
-          const matchesUserFormat = isString(firstData[2]) && isNumber(firstData[3]) && isNumber(firstData[5])
+          const matchesUserFormat = isString(firstData[2]) && isNumber(firstData[4]) && isNumber(firstData[5])
 
           if (matchesUserFormat) {
             codeIdx = 0
             nameIdx = 2
-            qtyIdx = 3
+            qtyIdx = 4
             costIdx = 5
           } else {
             // Default to Template/Compact format
@@ -1969,7 +1989,7 @@ export default function BodegaApp() {
 
         setMonthlyStatus({
           loading: false,
-          message: `Mes "${monthLabel}": ${importedItems.length} registros importados.`,
+          message: `Mes "${monthLabel}": ${importedItems.length} registros importados (de ${dataRows.length} filas leídas).`,
           type: 'success',
         })
         window.setTimeout(() => setMonthlyStatus({ loading: false, message: '', type: '' }), 4000)
